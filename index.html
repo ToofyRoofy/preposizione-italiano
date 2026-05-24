@@ -210,7 +210,6 @@ const CHUNKS = [
   {it:'al secondo piano', ar:'في الطابق الثاني', note:'الطوابق وجهات تأخذ a — al = a + il: abito al secondo piano = أسكن في الطابق الثاني'},
   {it:'al supermercato', ar:'في السوبرماركت', note:'الأسواق والمحلات وجهات تأخذ a — al = a + il: vado al supermercato'},
   {it:'al telefono', ar:'بالهاتف/على الهاتف', note:'مشغول باستخدام الهاتف/الاتصال'},
-
   {it:'alla festa', ar:'في الحفلة', note:'المناسبات والحفلات وجهات تأخذ a — festa مؤنث: vado alla festa = أروح الحفلة'},
   {it:'alla madre', ar:'للأم', note:'حرف a لتوجيه وإعطاء المفعول به الثاني (مباشر وغير مباشر)'},
   {it:'alla stazione', ar:'في المحطة', note:'المحطة وجهة تأخذ a — وهي مؤنث: alla = a + la: vado alla stazione'},
@@ -444,7 +443,7 @@ const MASTERY = [
   { lv:3, name:'قوي',        days:14, decay:2 },
   { lv:4, name:'محفوظ جيداً',days:30, decay:1 }
 ];
-let appState = { cp:{}, sets:{A:0, B:0, C:0, D:0, E:0}, tts:true, ips:null, lastDecay:null };
+let appState = { cp:{}, sets:{A:0, B:0, C:0, D:0, E:0, F:0, G:0, H:0}, tts:true, ips:null, lastDecay:null };
 let session = null;
 let sessionStats = { c:0, w:0 };
 let currentItem = null;
@@ -454,6 +453,14 @@ let retryMode = false;
 
 function $(id) { return document.getElementById(id); }
 function norm(s) { return (s || '').trim().toLowerCase().replace(/[.,!?]/g, '').replace(/\s+/g, ' ').replace(/[\u2018\u2019\u0060\u02BC']/g, "'"); }
+function normDecomp(s) {
+  // Accept "a + il" == "a+il" == "a il" for decompose answers
+  return norm(s).replace(/\s*\+\s*/g,'+').replace(/\s+/g,'');
+}
+function normCombine(s) {
+  // Accept uppercase/lowercase for combine answers  
+  return norm(s).replace(/\s+/g,'');
+}
 function shuffle(a) { let b=[...a]; for(let i=b.length-1; i>0; i--) { const j=0|Math.random()*(i+1); [b[i],b[j]]=[b[j],b[i]]; } return b; }
 function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appState)); } catch(e){} }
 function load() { 
@@ -461,6 +468,8 @@ function load() {
   if(appState.sets === undefined) appState.sets = {A:0, B:0, C:0, D:0, E:0, F:0, G:0};
   if(appState.sets.D === undefined) appState.sets.D = 0;
   if(appState.sets.E === undefined) appState.sets.E = 0;
+  if(appState.sets.G === undefined) appState.sets.G = 0;
+  if(appState.sets.H === undefined) appState.sets.H = 0;
   if(appState.tts === undefined) appState.tts = true;
 }
 
@@ -528,42 +537,717 @@ const SET_F_CHUNKS = [
 
 
 const SET_G_CHUNKS = [
-  {it:'AL',    ar:'a + il',    note:'مذكر مفرد يبدأ بساكن عادي — al bar, al lavoro, al parco'},
-  {it:'ALLO',  ar:'a + lo',    note:'مذكر مفرد يبدأ بـ s+ساكن أو z — allo stadio, allo specchio'},
-  {it:'ALLA',  ar:'a + la',    note:'مؤنث مفرد يبدأ بساكن — alla stazione, alla festa'},
-  {it:"ALL'",  ar:"a + l'",    note:"مفرد يبدأ بمتحرك أي جنس — all'ospedale, all'università"},
-  {it:'AI',    ar:'a + i',     note:'جمع مذكر عادي — ai bambini, ai miei amici'},
-  {it:'AGLI',  ar:'a + gli',   note:'جمع مذكر يبدأ بمتحرك أو s+ساكن — agli amici, agli studenti'},
-  {it:'ALLE',  ar:'a + le',    note:'جمع مؤنث دائماً — alle ragazze, alle feste'},
-  {it:'DAL',   ar:'da + il',   note:'مذكر مفرد ساكن — dal dottore, dal lavoro, dal treno'},
-  {it:'DALLO', ar:'da + lo',   note:'مذكر مفرد s+ساكن أو z — dallo stadio, dallo specchio'},
-  {it:'DALLA', ar:'da + la',   note:'مؤنث مفرد ساكن — dalla porta, dalla stazione'},
-  {it:"DALL'", ar:"da + l'",   note:"مفرد متحرك أي جنس — dall'amico, dall'ospedale"},
-  {it:'DAI',   ar:'da + i',    note:'جمع مذكر عادي — dai miei amici, dai ragazzi'},
-  {it:'DAGLI', ar:'da + gli',  note:'جمع مذكر متحرك أو s+ساكن — dagli amici, dagli studenti'},
-  {it:'DALLE', ar:'da + le',   note:'جمع مؤنث — dalle ragazze, dalle case'},
-  {it:'NEL',   ar:'in + il',   note:'مذكر مفرد ساكن — nel salotto, nel parco, nel pomeriggio'},
-  {it:'NELLO', ar:'in + lo',   note:'مذكر مفرد s+ساكن أو z — nello stadio, nello specchio'},
-  {it:'NELLA', ar:'in + la',   note:'مؤنث مفرد ساكن — nella stanza, nella cucina'},
-  {it:"NELL'", ar:"in + l'",   note:"مفرد متحرك أي جنس — nell'appartamento, nell'aria"},
-  {it:'NEI',   ar:'in + i',    note:'جمع مذكر عادي — nei parchi, nei libri'},
-  {it:'NEGLI', ar:'in + gli',  note:'جمع مذكر متحرك أو s+ساكن — negli appartamenti, negli stadi'},
-  {it:'NELLE', ar:'in + le',   note:'جمع مؤنث — nelle case, nelle strade'},
-  {it:'SUL',   ar:'su + il',   note:'مذكر مفرد ساكن — sul tavolo, sul cellulare, sul web'},
-  {it:'SULLO', ar:'su + lo',   note:'مذكر مفرد s+ساكن أو z — sullo schermo, sullo zaino'},
-  {it:'SULLA', ar:'su + la',   note:'مؤنث مفرد ساكن — sulla sedia, sulla strada'},
-  {it:"SULL'", ar:"su + l'",   note:"مفرد متحرك أي جنس — sull'autobus, sull'albero"},
-  {it:'SUI',   ar:'su + i',    note:'جمع مذكر عادي — sui libri, sui tavoli'},
-  {it:'SUGLI', ar:'su + gli',  note:'جمع مذكر متحرك أو s+ساكن — sugli alberi, sugli specchi'},
-  {it:'SULLE', ar:'su + le',   note:'جمع مؤنث — sulle sedie, sulle scale'},
-  {it:'DEL',   ar:'di + il',   note:'مذكر مفرد ساكن — del pane, del tempo, del vino'},
-  {it:'DELLO', ar:'di + lo',   note:'مذكر مفرد s+ساكن أو z — dello studente, dello zaino'},
-  {it:'DELLA', ar:'di + la',   note:'مؤنث مفرد ساكن — della porta, della casa'},
-  {it:"DELL'", ar:"di + l'",   note:"مفرد متحرك أي جنس — dell'amico, dell'estate"},
-  {it:'DEI',   ar:'di + i',    note:'جمع مذكر عادي — dei libri, dei ragazzi'},
-  {it:'DEGLI', ar:'di + gli',  note:'جمع مذكر متحرك أو s+ساكن — degli amici, degli studenti'},
-  {it:'DELLE', ar:'di + le',   note:'جمع مؤنث — delle ragazze, delle case'},
+  // ── IL (مذكر مفرد ساكن عادي) ──
+  {it:'AL',    ar:'a + il',    note:'مذكر مفرد يبدأ بساكن عادي — a + il = AL',
+   decomp:'a + il', prep:'a', art:'il',
+   examples:[{it:'al bar',ar:'في الكافيه'},{it:'al lavoro',ar:'في العمل'},{it:'al parco',ar:'في الحديقة'},{it:'al mercato',ar:'في السوق'}]},
+  {it:'DAL',   ar:'da + il',   note:'مذكر مفرد ساكن — da + il = DAL',
+   decomp:'da + il', prep:'da', art:'il',
+   examples:[{it:'dal dottore',ar:'من عند الطبيب'},{it:'dal lavoro',ar:'من العمل'},{it:'dal treno',ar:'من القطار'},{it:'dal bar',ar:'من الكافيه'}]},
+  {it:'NEL',   ar:'in + il',   note:'مذكر مفرد ساكن — in + il = NEL',
+   decomp:'in + il', prep:'in', art:'il',
+   examples:[{it:'nel salotto',ar:'في الصالون'},{it:'nel parco',ar:'في الحديقة'},{it:'nel pomeriggio',ar:'بعد الظهر'},{it:'nel libro',ar:'في الكتاب'}]},
+  {it:'SUL',   ar:'su + il',   note:'مذكر مفرد ساكن — su + il = SUL',
+   decomp:'su + il', prep:'su', art:'il',
+   examples:[{it:'sul tavolo',ar:'على الطاولة'},{it:'sul cellulare',ar:'على الموبايل'},{it:'sul web',ar:'على الإنترنت'},{it:'sul treno',ar:'على القطار'}]},
+  {it:'DEL',   ar:'di + il',   note:'مذكر مفرد ساكن — di + il = DEL',
+   decomp:'di + il', prep:'di', art:'il',
+   examples:[{it:'del pane',ar:'من الخبز'},{it:'del tempo',ar:'من الوقت'},{it:'del vino',ar:'من النبيذ'},{it:'del caffè',ar:'من القهوة'}]},
+  // ── LA (مؤنث مفرد ساكن) ──
+  {it:'ALLA',  ar:'a + la',    note:'مؤنث مفرد يبدأ بساكن — a + la = ALLA',
+   decomp:'a + la', prep:'a', art:'la',
+   examples:[{it:'alla stazione',ar:'إلى المحطة'},{it:'alla festa',ar:'في الحفل'},{it:'alla fine',ar:'في النهاية'},{it:'alla porta',ar:'عند الباب'}]},
+  {it:'DALLA', ar:'da + la',   note:'مؤنث مفرد ساكن — da + la = DALLA',
+   decomp:'da + la', prep:'da', art:'la',
+   examples:[{it:'dalla porta',ar:'من الباب'},{it:'dalla stazione',ar:'من المحطة'},{it:'dalla finestra',ar:'من النافذة'},{it:'dalla mamma',ar:'من الأم'}]},
+  {it:'NELLA', ar:'in + la',   note:'مؤنث مفرد ساكن — in + la = NELLA',
+   decomp:'in + la', prep:'in', art:'la',
+   examples:[{it:'nella stanza',ar:'في الغرفة'},{it:'nella cucina',ar:'في المطبخ'},{it:'nella borsa',ar:'في الحقيبة'},{it:'nella casa',ar:'في المنزل'}]},
+  {it:'SULLA', ar:'su + la',   note:'مؤنث مفرد ساكن — su + la = SULLA',
+   decomp:'su + la', prep:'su', art:'la',
+   examples:[{it:'sulla sedia',ar:'على الكرسي'},{it:'sulla strada',ar:'على الطريق'},{it:'sulla carta',ar:'على الورقة'},{it:'sulla tavola',ar:'على المائدة'}]},
+  {it:'DELLA', ar:'di + la',   note:'مؤنث مفرد ساكن — di + la = DELLA',
+   decomp:'di + la', prep:'di', art:'la',
+   examples:[{it:'della casa',ar:'من/لـ المنزل'},{it:'della pizza',ar:'من/لـ البيتزا'},{it:'della città',ar:'من/لـ المدينة'},{it:'della famiglia',ar:'من/لـ العائلة'}]},
+  // ── L' (مفرد متحرك) ──
+  {it:"ALL'",  ar:"a + l'",    note:"مفرد يبدأ بمتحرك أي جنس — a + l' = ALL'",
+   decomp:"a + l'", prep:'a', art:"l'",
+   examples:[{it:"all'ospedale",ar:"إلى المستشفى"},{it:"all'università",ar:"إلى الجامعة"},{it:"all'aeroporto",ar:"إلى المطار"},{it:"all'inizio",ar:"في البداية"}]},
+  {it:"DALL'", ar:"da + l'",   note:"مفرد متحرك أي جنس — da + l' = DALL'",
+   decomp:"da + l'", prep:'da', art:"l'",
+   examples:[{it:"dall'amico",ar:"من الصديق"},{it:"dall'ospedale",ar:"من المستشفى"},{it:"dall'aeroporto",ar:"من المطار"},{it:"dall'inizio",ar:"من البداية"}]},
+  {it:"NELL'", ar:"in + l'",   note:"مفرد متحرك أي جنس — in + l' = NELL'",
+   decomp:"in + l'", prep:'in', art:"l'",
+   examples:[{it:"nell'appartamento",ar:"في الشقة"},{it:"nell'aria",ar:"في الهواء"},{it:"nell'ospedale",ar:"في المستشفى"},{it:"nell'università",ar:"في الجامعة"}]},
+  {it:"SULL'", ar:"su + l'",   note:"مفرد متحرك أي جنس — su + l' = SULL'",
+   decomp:"su + l'", prep:'su', art:"l'",
+   examples:[{it:"sull'autobus",ar:"على الأتوبيس"},{it:"sull'albero",ar:"على الشجرة"},{it:"sull'aereo",ar:"على الطائرة"},{it:"sull'isola",ar:"على الجزيرة"}]},
+  {it:"DELL'", ar:"di + l'",   note:"مفرد متحرك أي جنس — di + l' = DELL'",
+   decomp:"di + l'", prep:'di', art:"l'",
+   examples:[{it:"dell'amico",ar:"لـ/من الصديق"},{it:"dell'estate",ar:"من/لـ الصيف"},{it:"dell'acqua",ar:"من الماء"},{it:"dell'ospedale",ar:"من المستشفى"}]},
+  // ── LO (مذكر مفرد s+ساكن أو z) ──
+  {it:'ALLO',  ar:'a + lo',    note:'مذكر مفرد يبدأ بـ s+ساكن أو z — a + lo = ALLO',
+   decomp:'a + lo', prep:'a', art:'lo',
+   examples:[{it:'allo stadio',ar:'إلى الملعب'},{it:'allo specchio',ar:'في المرآة'},{it:'allo studente',ar:'للطالب'},{it:'allo zaino',ar:'للحقيبة'}]},
+  {it:'DALLO', ar:'da + lo',   note:'مذكر مفرد s+ساكن أو z — da + lo = DALLO',
+   decomp:'da + lo', prep:'da', art:'lo',
+   examples:[{it:'dallo stadio',ar:'من الملعب'},{it:'dallo specchio',ar:'من المرآة'},{it:'dallo studente',ar:'من الطالب'},{it:'dallo zaino',ar:'من الحقيبة'}]},
+  {it:'NELLO', ar:'in + lo',   note:'مذكر مفرد s+ساكن أو z — in + lo = NELLO',
+   decomp:'in + lo', prep:'in', art:'lo',
+   examples:[{it:'nello stadio',ar:'في الملعب'},{it:'nello specchio',ar:'في المرآة'},{it:'nello zaino',ar:'في الحقيبة'},{it:'nello stesso posto',ar:'في نفس المكان'}]},
+  {it:'SULLO', ar:'su + lo',   note:'مذكر مفرد s+ساكن أو z — su + lo = SULLO',
+   decomp:'su + lo', prep:'su', art:'lo',
+   examples:[{it:'sullo schermo',ar:'على الشاشة'},{it:'sullo zaino',ar:'على الحقيبة'},{it:'sullo stadio',ar:'فوق الملعب'},{it:'sullo stesso tavolo',ar:'على نفس الطاولة'}]},
+  {it:'DELLO', ar:'di + lo',   note:'مذكر مفرد s+ساكن أو z — di + lo = DELLO',
+   decomp:'di + lo', prep:'di', art:'lo',
+   examples:[{it:'dello studente',ar:'لـ/من الطالب'},{it:'dello zaino',ar:'لـ/من الحقيبة'},{it:'dello stadio',ar:'لـ/من الملعب'},{it:'dello specchio',ar:'لـ/من المرآة'}]},
+  // ── الجمع المذكر عادي ──
+  {it:'AI',    ar:'a + i',     note:'جمع مذكر عادي — a + i = AI',
+   decomp:'a + i', prep:'a', art:'i',
+   examples:[{it:'ai bambini',ar:'للأطفال'},{it:'ai ragazzi',ar:'للشباب'},{it:'ai negozi',ar:'للمحلات'},{it:'ai miei amici',ar:'لأصدقائي'}]},
+  {it:'DAI',   ar:'da + i',    note:'جمع مذكر عادي — da + i = DAI',
+   decomp:'da + i', prep:'da', art:'i',
+   examples:[{it:'dai ragazzi',ar:'من الشباب'},{it:'dai miei amici',ar:'من أصدقائي'},{it:'dai bambini',ar:'من الأطفال'},{it:'dai negozi',ar:'من المحلات'}]},
+  {it:'NEI',   ar:'in + i',    note:'جمع مذكر عادي — in + i = NEI',
+   decomp:'in + i', prep:'in', art:'i',
+   examples:[{it:'nei parchi',ar:'في الحدائق'},{it:'nei libri',ar:'في الكتب'},{it:'nei negozi',ar:'في المحلات'},{it:'nei paesi',ar:'في البلدان'}]},
+  {it:'SUI',   ar:'su + i',    note:'جمع مذكر عادي — su + i = SUI',
+   decomp:'su + i', prep:'su', art:'i',
+   examples:[{it:'sui libri',ar:'على الكتب'},{it:'sui tavoli',ar:'على الطاولات'},{it:'sui giornali',ar:'في الجرائد'},{it:'sui muri',ar:'على الجدران'}]},
+  {it:'DEI',   ar:'di + i',    note:'جمع مذكر عادي — di + i = DEI',
+   decomp:'di + i', prep:'di', art:'i',
+   examples:[{it:'dei libri',ar:'من/بعض الكتب'},{it:'dei ragazzi',ar:'من/بعض الشباب'},{it:'dei problemi',ar:'من المشاكل'},{it:'dei soldi',ar:'من الأموال'}]},
+  // ── الجمع المذكر متحرك/s+ساكن ──
+  {it:'AGLI',  ar:'a + gli',   note:'جمع مذكر متحرك أو s+ساكن — a + gli = AGLI',
+   decomp:'a + gli', prep:'a', art:'gli',
+   examples:[{it:'agli amici',ar:'للأصدقاء'},{it:'agli studenti',ar:'للطلاب'},{it:'agli alberi',ar:'للأشجار'},{it:'agli esami',ar:'للامتحانات'}]},
+  {it:'DAGLI', ar:'da + gli',  note:'جمع مذكر متحرك أو s+ساكن — da + gli = DAGLI',
+   decomp:'da + gli', prep:'da', art:'gli',
+   examples:[{it:'dagli amici',ar:'من الأصدقاء'},{it:'dagli studenti',ar:'من الطلاب'},{it:'dagli alberi',ar:'من الأشجار'},{it:'dagli esami',ar:'من الامتحانات'}]},
+  {it:'NEGLI', ar:'in + gli',  note:'جمع مذكر متحرك أو s+ساكن — in + gli = NEGLI',
+   decomp:'in + gli', prep:'in', art:'gli',
+   examples:[{it:'negli appartamenti',ar:'في الشقق'},{it:'negli stadi',ar:'في الملاعب'},{it:'negli esami',ar:'في الامتحانات'},{it:'negli anni',ar:'في السنوات'}]},
+  {it:'SUGLI', ar:'su + gli',  note:'جمع مذكر متحرك أو s+ساكن — su + gli = SUGLI',
+   decomp:'su + gli', prep:'su', art:'gli',
+   examples:[{it:'sugli alberi',ar:'على الأشجار'},{it:'sugli specchi',ar:'على المرايا'},{it:'sugli scaffali',ar:'على الرفوف'},{it:'sugli studenti',ar:'عن الطلاب'}]},
+  {it:'DEGLI', ar:'di + gli',  note:'جمع مذكر متحرك أو s+ساكن — di + gli = DEGLI',
+   decomp:'di + gli', prep:'di', art:'gli',
+   examples:[{it:'degli amici',ar:'من/بعض الأصدقاء'},{it:'degli studenti',ar:'من/بعض الطلاب'},{it:'degli alberi',ar:'من الأشجار'},{it:'degli esercizi',ar:'من التمارين'}]},
+  // ── الجمع المؤنث ──
+  {it:'ALLE',  ar:'a + le',    note:'جمع مؤنث دائماً — a + le = ALLE',
+   decomp:'a + le', prep:'a', art:'le',
+   examples:[{it:'alle ragazze',ar:'للبنات'},{it:'alle feste',ar:'للحفلات'},{it:'alle otto',ar:'الساعة الثامنة'},{it:'alle scuole',ar:'للمدارس'}]},
+  {it:'DALLE', ar:'da + le',   note:'جمع مؤنث — da + le = DALLE',
+   decomp:'da + le', prep:'da', art:'le',
+   examples:[{it:'dalle ragazze',ar:'من البنات'},{it:'dalle case',ar:'من المنازل'},{it:'dalle otto',ar:'من الساعة الثامنة'},{it:'dalle strade',ar:'من الشوارع'}]},
+  {it:'NELLE', ar:'in + le',   note:'جمع مؤنث — in + le = NELLE',
+   decomp:'in + le', prep:'in', art:'le',
+   examples:[{it:'nelle case',ar:'في المنازل'},{it:'nelle strade',ar:'في الشوارع'},{it:'nelle scuole',ar:'في المدارس'},{it:'nelle città',ar:'في المدن'}]},
+  {it:'SULLE', ar:'su + le',   note:'جمع مؤنث — su + le = SULLE',
+   decomp:'su + le', prep:'su', art:'le',
+   examples:[{it:'sulle sedie',ar:'على الكراسي'},{it:'sulle scale',ar:'على السلالم'},{it:'sulle mappe',ar:'على الخرائط'},{it:'sulle strade',ar:'على الطرق'}]},
+  {it:'DELLE', ar:'di + le',   note:'جمع مؤنث — di + le = DELLE',
+   decomp:'di + le', prep:'di', art:'le',
+   examples:[{it:'delle ragazze',ar:'من/بعض البنات'},{it:'delle case',ar:'من/بعض المنازل'},{it:'delle città',ar:'من/بعض المدن'},{it:'delle strade',ar:'من الشوارع'}]},
 ];
+
+/* ─── CONTEXT_SENTENCES ─── */
+const CONTEXT_SENTENCES = [
+  // Stage 1 — IL
+  {blank:'Vado ___ bar.',             full:'Vado al bar.',              answer:'al',    prep:'a',  art:'il',  ar:'أذهب إلى الكافيه',       stage:1},
+  {blank:'Torno ___ lavoro.',         full:'Torno dal lavoro.',         answer:'dal',   prep:'da', art:'il',  ar:'أعود من العمل',           stage:1},
+  {blank:'Il libro è ___ tavolo.',    full:'Il libro è sul tavolo.',    answer:'sul',   prep:'su', art:'il',  ar:'الكتاب على الطاولة',      stage:1},
+  {blank:'Parlo ___ professore.',     full:'Parlo del professore.',     answer:'del',   prep:'di', art:'il',  ar:'أتكلم عن الأستاذ',        stage:1},
+  {blank:'Vado ___ parco.',           full:'Vado nel parco.',           answer:'nel',   prep:'in', art:'il',  ar:'أذهب في الحديقة',         stage:1},
+  // Stage 2 — LA + L'
+  {blank:'Vado ___ stazione.',        full:'Vado alla stazione.',       answer:'alla',  prep:'a',  art:'la',  ar:'أذهب إلى المحطة',         stage:2},
+  {blank:'Vengo ___ scuola.',         full:'Vengo dalla scuola.',       answer:'dalla', prep:'da', art:'la',  ar:'أجيء من المدرسة',         stage:2},
+  {blank:'Il telefono è ___ borsa.',  full:"Il telefono è nella borsa.",answer:'nella', prep:'in', art:'la',  ar:'الهاتف في الحقيبة',       stage:2},
+  {blank:'Il gatto è ___ sedia.',     full:"Il gatto è sulla sedia.",   answer:'sulla', prep:'su', art:'la',  ar:'القطة على الكرسي',        stage:2},
+  {blank:"Vado ___ università.",      full:"Vado all'università.",      answer:"all'",  prep:'a',  art:"l'",  ar:'أذهب إلى الجامعة',        stage:2},
+  {blank:"Torno ___ ospedale.",       full:"Torno dall'ospedale.",      answer:"dall'", prep:'da', art:"l'",  ar:'أعود من المستشفى',        stage:2},
+  {blank:"Sono ___ appartamento.",    full:"Sono nell'appartamento.",   answer:"nell'", prep:'in', art:"l'",  ar:'أنا في الشقة',            stage:2},
+  {blank:"Il telefono è ___ autobus.",full:"Il telefono è sull'autobus.",answer:"sull'",prep:'su', art:"l'",  ar:'الهاتف على الأتوبيس',    stage:2},
+  // Stage 3 — LO
+  {blank:'Vado ___ stadio.',          full:'Vado allo stadio.',         answer:'allo',  prep:'a',  art:'lo',  ar:'أذهب إلى الملعب',         stage:3},
+  {blank:'Torno ___ stadio.',         full:'Torno dallo stadio.',       answer:'dallo', prep:'da', art:'lo',  ar:'أعود من الملعب',          stage:3},
+  {blank:"L'immagine è ___ schermo.", full:"L'immagine è sullo schermo.",answer:'sullo',prep:'su', art:'lo',  ar:'الصورة على الشاشة',       stage:3},
+  {blank:'I colori ___ zaino sono belli.', full:'I colori dello zaino sono belli.', answer:'dello', prep:'di', art:'lo', ar:'ألوان الحقيبة جميلة', stage:3},
+  // Stage 4 — الجمع
+  {blank:'Parlo ___ amici.',          full:'Parlo degli amici.',        answer:'degli', prep:'di', art:'gli', ar:'أتكلم عن الأصدقاء',       stage:4},
+  {blank:'Vado ___ negozi.',          full:'Vado ai negozi.',           answer:'ai',    prep:'a',  art:'i',   ar:'أذهب إلى المحلات',        stage:4},
+  {blank:'Vado ___ feste.',           full:'Vado alle feste.',          answer:'alle',  prep:'a',  art:'le',  ar:'أذهب إلى الحفلات',        stage:4},
+  {blank:'Torno ___ ragazzi.',        full:'Torno dai ragazzi.',        answer:'dai',   prep:'da', art:'i',   ar:'أعود من الشباب',          stage:4},
+  {blank:'Abito ___ case nuove.',     full:'Abito nelle case nuove.',   answer:'nelle', prep:'in', art:'le',  ar:'أسكن في المنازل الجديدة', stage:4},
+  {blank:'I libri sono ___ scaffali.',full:'I libri sono sugli scaffali.',answer:'sugli',prep:'su',art:'gli',  ar:'الكتب على الرفوف',        stage:4},
+  // Stage 5 — مختلط
+  {blank:'Arrivo ___ aeroporto.',     full:"Arrivo all'aeroporto.",     answer:"all'",  prep:'a',  art:"l'",  ar:'أصل إلى المطار',          stage:5},
+  {blank:'Vengo ___ mercato.',        full:'Vengo dal mercato.',        answer:'dal',   prep:'da', art:'il',  ar:'أجيء من السوق',           stage:5},
+];
+
+/* ─── COMMON_MISTAKES ─── */
+const COMMON_MISTAKES = [
+  {wrong:"in il parco",  correct:"nel parco",    rule:"in + il = nel دائماً، لا تُكتبان منفصلتين",          tip:"حروف الجر a/da/in/su/di تتدمج مع il/lo/la/l'/i/gli/le وجوباً"},
+  {wrong:"a il bar",     correct:"al bar",        rule:"a + il = al دائماً",                                  tip:"الدمج إجباري وليس اختيارياً في الإيطالية"},
+  {wrong:"di il pane",   correct:"del pane",      rule:"di + il = del",                                       tip:"di تتدمج مع كل أدوات التعريف"},
+  {wrong:"su la sedia",  correct:"sulla sedia",   rule:"su + la = sulla",                                     tip:"su تتدمج مع la وتصبح sulla"},
+  {wrong:"da il dottore",correct:"dal dottore",   rule:"da + il = dal",                                       tip:"da تتدمج مع il وتصبح dal"},
+  {wrong:"col ragazzo",  correct:"con il ragazzo",rule:"con لا تتدمج في الإيطالية الحديثة",                   tip:"col شكل قديم لا يُستخدم اليوم — استخدم con il دائماً"},
+  {wrong:"alle ragazzi", correct:"ai ragazzi",    rule:"alle = a + le (مؤنث جمع) — ragazzi مذكر جمع",        tip:"ai للجمع المذكر العادي، alle للجمع المؤنث فقط"},
+  {wrong:"ai ragazze",   correct:"alle ragazze",  rule:"ai = a + i (مذكر جمع) — ragazze مؤنث جمع",           tip:"alle للجمع المؤنث، ai للجمع المذكر"},
+  {wrong:"al studente",  correct:"allo studente", rule:"studente يبدأ بـ st → نستخدم lo وليس il",             tip:"الكلمات التي تبدأ بـ s+ساكن أو z تأخذ lo/allo/dello/..."},
+  {wrong:"degli ragazze",correct:"delle ragazze", rule:"degli = di + gli (مذكر) — ragazze مؤنث جمع",          tip:"delle للجمع المؤنث، degli للجمع المذكر المتحرك أو s+ساكن"},
+  {wrong:"a il mercato", correct:"al mercato",    rule:"a + il = al — الدمج إجباري دائماً",                   tip:"لا يمكن كتابة حروف الجر الخمسة مع أدوات التعريف منفصلة"},
+];
+
+/* ═══════════════════════════ LEARNING UNITS — نظام الطبقات الأربع ═══════════════════════════ */
+/*
+  كل وحدة تعليمية تمر بـ 4 طبقات:
+  Layer 1: الكلمة (vocab) — تعلم الكلمة الأساسية ومعناها وجنسها
+  Layer 2: حرف الجر (prep) — تعلم حرف الجر ومعناه ولماذا يُستخدم هنا
+  Layer 3: منطق الدمج (fusion) — شرح كيف ولماذا يحدث الدمج
+  Layer 4: التطبيق (application) — أسئلة تطبيقية متنوعة
+*/
+
+const LEARNING_UNITS = [
+  // ═══════════════════════════ مجموعة AL (a + il) ═══════════════════════════
+  {
+    id: 'al_bar',
+    vocab: {
+      word: 'bar',
+      ar: 'كافيه / بار',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il bar è aperto.', ar: 'الكافيه مفتوح.'}
+    },
+    prep: {
+      letter: 'a',
+      meaning: 'إلى / في',
+      why_here: 'لأننا نذهب إلى مكان (وجهة)',
+      example: {it: 'Vado a Roma.', ar: 'أذهب إلى روما.'}
+    },
+    fusion: {
+      formula: 'a + il = al',
+      result: 'al',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'bar مذكر (il bar)، وحرف الجر a مع il يتدمجان ويصبحان al'
+    },
+    expression: {
+      it: 'al bar',
+      ar: 'إلى الكافيه / في الكافيه',
+      sentences: [
+        {it: 'Vado al bar.', ar: 'أذهب إلى الكافيه.'},
+        {it: 'Sono al bar.', ar: 'أنا في الكافيه.'},
+        {it: 'Ti aspetto al bar.', ar: 'أنتظرك في الكافيه.'}
+      ]
+    },
+    stage: 1
+  },
+  {
+    id: 'al_lavoro',
+    vocab: {
+      word: 'lavoro',
+      ar: 'عمل / شغل',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il lavoro è importante.', ar: 'العمل مهم.'}
+    },
+    prep: {
+      letter: 'a',
+      meaning: 'إلى / في',
+      why_here: 'لأننا نذهب إلى مكان العمل',
+      example: {it: 'Vado a scuola.', ar: 'أذهب إلى المدرسة.'}
+    },
+    fusion: {
+      formula: 'a + il = al',
+      result: 'al',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'lavoro مذكر (il lavoro)، وحرف الجر a مع il يتدمجان ويصبحان al'
+    },
+    expression: {
+      it: 'al lavoro',
+      ar: 'في العمل / إلى العمل',
+      sentences: [
+        {it: 'Vado al lavoro.', ar: 'أذهب إلى العمل.'},
+        {it: 'Sono al lavoro.', ar: 'أنا في العمل.'},
+        {it: 'Torno dal lavoro.', ar: 'أعود من العمل.'}
+      ]
+    },
+    stage: 1
+  },
+  {
+    id: 'al_parco',
+    vocab: {
+      word: 'parco',
+      ar: 'حديقة / متنزه',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il parco è grande.', ar: 'الحديقة كبيرة.'}
+    },
+    prep: {
+      letter: 'a',
+      meaning: 'إلى / في',
+      why_here: 'لأننا نذهب إلى مكان للتنزه',
+      example: {it: 'Vado a casa.', ar: 'أذهب إلى البيت.'}
+    },
+    fusion: {
+      formula: 'a + il = al',
+      result: 'al',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'parco مذكر (il parco)، وحرف الجر a مع il يتدمجان ويصبحان al'
+    },
+    expression: {
+      it: 'al parco',
+      ar: 'في الحديقة / إلى الحديقة',
+      sentences: [
+        {it: 'Vado al parco.', ar: 'أذهب إلى الحديقة.'},
+        {it: 'Gioco al parco.', ar: 'ألعب في الحديقة.'},
+        {it: 'I bambini sono al parco.', ar: 'الأطفال في الحديقة.'}
+      ]
+    },
+    stage: 1
+  },
+  {
+    id: 'al_ristorante',
+    vocab: {
+      word: 'ristorante',
+      ar: 'مطعم',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il ristorante è buono.', ar: 'المطعم جيد.'}
+    },
+    prep: {
+      letter: 'a',
+      meaning: 'إلى / في',
+      why_here: 'لأننا نذهب إلى مكان لتناول الطعام',
+      example: {it: 'Andiamo a mangiare.', ar: 'نذهب لنأكل.'}
+    },
+    fusion: {
+      formula: 'a + il = al',
+      result: 'al',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'ristorante مذكر (il ristorante)، وحرف الجر a مع il يتدمجان ويصبحان al'
+    },
+    expression: {
+      it: 'al ristorante',
+      ar: 'في المطعم / إلى المطعم',
+      sentences: [
+        {it: 'Andiamo al ristorante.', ar: 'نذهب إلى المطعم.'},
+        {it: 'Mangio al ristorante.', ar: 'آكل في المطعم.'},
+        {it: 'Lavoro al ristorante.', ar: 'أعمل في المطعم.'}
+      ]
+    },
+    stage: 1
+  },
+  // ═══════════════════════════ مجموعة ALLA (a + la) ═══════════════════════════
+  {
+    id: 'alla_stazione',
+    vocab: {
+      word: 'stazione',
+      ar: 'محطة',
+      gender: 'femminile',
+      article: 'la',
+      starts_with: 'consonant',
+      example: {it: 'La stazione è vicina.', ar: 'المحطة قريبة.'}
+    },
+    prep: {
+      letter: 'a',
+      meaning: 'إلى / في',
+      why_here: 'لأننا نذهب إلى مكان (محطة القطار/الباص)',
+      example: {it: 'Vado a Roma.', ar: 'أذهب إلى روما.'}
+    },
+    fusion: {
+      formula: 'a + la = alla',
+      result: 'alla',
+      rule: 'مؤنث مفرد يبدأ بساكن',
+      explanation: 'stazione مؤنث (la stazione)، وحرف الجر a مع la يتدمجان ويصبحان alla'
+    },
+    expression: {
+      it: 'alla stazione',
+      ar: 'في المحطة / إلى المحطة',
+      sentences: [
+        {it: 'Vado alla stazione.', ar: 'أذهب إلى المحطة.'},
+        {it: 'Ti aspetto alla stazione.', ar: 'أنتظرك في المحطة.'},
+        {it: 'Arrivo alla stazione.', ar: 'أصل إلى المحطة.'}
+      ]
+    },
+    stage: 2
+  },
+  {
+    id: 'alla_festa',
+    vocab: {
+      word: 'festa',
+      ar: 'حفلة',
+      gender: 'femminile',
+      article: 'la',
+      starts_with: 'consonant',
+      example: {it: 'La festa è bellissima.', ar: 'الحفلة جميلة جدا.'}
+    },
+    prep: {
+      letter: 'a',
+      meaning: 'إلى / في',
+      why_here: 'لأننا نذهب إلى مناسبة أو حدث',
+      example: {it: 'Vado a ballare.', ar: 'أذهب للرقص.'}
+    },
+    fusion: {
+      formula: 'a + la = alla',
+      result: 'alla',
+      rule: 'مؤنث مفرد يبدأ بساكن',
+      explanation: 'festa مؤنث (la festa)، وحرف الجر a مع la يتدمجان ويصبحان alla'
+    },
+    expression: {
+      it: 'alla festa',
+      ar: 'في الحفلة / إلى الحفلة',
+      sentences: [
+        {it: 'Vado alla festa.', ar: 'أذهب إلى الحفلة.'},
+        {it: 'Ci vediamo alla festa.', ar: 'نلتقي في الحفلة.'},
+        {it: 'Ballo alla festa.', ar: 'أرقص في الحفلة.'}
+      ]
+    },
+    stage: 2
+  },
+  // ═══════════════════════════ مجموعة DAL (da + il) ═══════════════════════════
+  {
+    id: 'dal_dottore',
+    vocab: {
+      word: 'dottore',
+      ar: 'طبيب / دكتور',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il dottore è bravo.', ar: 'الطبيب ماهر.'}
+    },
+    prep: {
+      letter: 'da',
+      meaning: 'عند / من',
+      why_here: 'da مع الأشخاص تعني "عند" — أذهب عند الطبيب في عيادته',
+      example: {it: 'Vengo da Roma.', ar: 'أجيء من روما.'}
+    },
+    fusion: {
+      formula: 'da + il = dal',
+      result: 'dal',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'dottore مذكر (il dottore)، وحرف الجر da مع il يتدمجان ويصبحان dal'
+    },
+    expression: {
+      it: 'dal dottore',
+      ar: 'عند الطبيب',
+      sentences: [
+        {it: 'Vado dal dottore.', ar: 'أذهب عند الطبيب.'},
+        {it: 'Torno dal dottore.', ar: 'أعود من عند الطبيب.'},
+        {it: 'Sono dal dottore.', ar: 'أنا عند الطبيب.'}
+      ]
+    },
+    stage: 1
+  },
+  {
+    id: 'dal_lavoro',
+    vocab: {
+      word: 'lavoro',
+      ar: 'عمل / شغل',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il lavoro è finito.', ar: 'العمل انتهى.'}
+    },
+    prep: {
+      letter: 'da',
+      meaning: 'من',
+      why_here: 'da تعني "من" — أعود قادما من العمل',
+      example: {it: 'Vengo da casa.', ar: 'أجيء من البيت.'}
+    },
+    fusion: {
+      formula: 'da + il = dal',
+      result: 'dal',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'lavoro مذكر (il lavoro)، وحرف الجر da مع il يتدمجان ويصبحان dal'
+    },
+    expression: {
+      it: 'dal lavoro',
+      ar: 'من العمل',
+      sentences: [
+        {it: 'Torno dal lavoro.', ar: 'أعود من العمل.'},
+        {it: 'Vengo dal lavoro.', ar: 'أجيء من العمل.'},
+        {it: 'Esco dal lavoro alle 6.', ar: 'أخرج من العمل الساعة 6.'}
+      ]
+    },
+    stage: 1
+  },
+  // ═══════════════════════════ مجموعة SUL (su + il) ═══════════════════════════
+  {
+    id: 'sul_tavolo',
+    vocab: {
+      word: 'tavolo',
+      ar: 'طاولة',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il tavolo è di legno.', ar: 'الطاولة من خشب.'}
+    },
+    prep: {
+      letter: 'su',
+      meaning: 'على',
+      why_here: 'su تعني "على" — الكتاب فوق سطح الطاولة',
+      example: {it: 'Il gatto è su.', ar: 'القط في الأعلى.'}
+    },
+    fusion: {
+      formula: 'su + il = sul',
+      result: 'sul',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'tavolo مذكر (il tavolo)، وحرف الجر su مع il يتدمجان ويصبحان sul'
+    },
+    expression: {
+      it: 'sul tavolo',
+      ar: 'على الطاولة',
+      sentences: [
+        {it: 'Il libro è sul tavolo.', ar: 'الكتاب على الطاولة.'},
+        {it: 'Metto le chiavi sul tavolo.', ar: 'أضع المفاتيح على الطاولة.'},
+        {it: 'Mangiamo sul tavolo.', ar: 'نأكل على الطاولة.'}
+      ]
+    },
+    stage: 1
+  },
+  {
+    id: 'sulla_sedia',
+    vocab: {
+      word: 'sedia',
+      ar: 'كرسي',
+      gender: 'femminile',
+      article: 'la',
+      starts_with: 'consonant',
+      example: {it: 'La sedia è comoda.', ar: 'الكرسي مريح.'}
+    },
+    prep: {
+      letter: 'su',
+      meaning: 'على',
+      why_here: 'su تعني "على" — شيء موضوع فوق سطح الكرسي',
+      example: {it: 'Siediti su.', ar: 'اجلس.'}
+    },
+    fusion: {
+      formula: 'su + la = sulla',
+      result: 'sulla',
+      rule: 'مؤنث مفرد يبدأ بساكن',
+      explanation: 'sedia مؤنث (la sedia)، وحرف الجر su مع la يتدمجان ويصبحان sulla'
+    },
+    expression: {
+      it: 'sulla sedia',
+      ar: 'على الكرسي',
+      sentences: [
+        {it: 'La borsa è sulla sedia.', ar: 'الحقيبة على الكرسي.'},
+        {it: 'Il gatto dorme sulla sedia.', ar: 'القط ينام على الكرسي.'},
+        {it: 'Siediti sulla sedia.', ar: 'اجلس على الكرسي.'}
+      ]
+    },
+    stage: 2
+  },
+  // ═══════════════════════════ مجموعة NEL (in + il) ═══════════════════════════
+  {
+    id: 'nel_parco',
+    vocab: {
+      word: 'parco',
+      ar: 'حديقة / متنزه',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il parco è bello.', ar: 'الحديقة جميلة.'}
+    },
+    prep: {
+      letter: 'in',
+      meaning: 'في',
+      why_here: 'in تعني "في" — داخل الحديقة',
+      example: {it: 'Sono in Italia.', ar: 'أنا في إيطاليا.'}
+    },
+    fusion: {
+      formula: 'in + il = nel',
+      result: 'nel',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'parco مذكر (il parco)، وحرف الجر in مع il يتدمجان ويصبحان nel'
+    },
+    expression: {
+      it: 'nel parco',
+      ar: 'في الحديقة',
+      sentences: [
+        {it: 'Cammino nel parco.', ar: 'أمشي في الحديقة.'},
+        {it: 'I bambini giocano nel parco.', ar: 'الأطفال يلعبون في الحديقة.'},
+        {it: 'C\'è un lago nel parco.', ar: 'يوجد بحيرة في الحديقة.'}
+      ]
+    },
+    stage: 1
+  },
+  {
+    id: 'nella_borsa',
+    vocab: {
+      word: 'borsa',
+      ar: 'حقيبة',
+      gender: 'femminile',
+      article: 'la',
+      starts_with: 'consonant',
+      example: {it: 'La borsa è nuova.', ar: 'الحقيبة جديدة.'}
+    },
+    prep: {
+      letter: 'in',
+      meaning: 'في',
+      why_here: 'in تعني "في" — داخل الحقيبة',
+      example: {it: 'Metto in tasca.', ar: 'أضع في الجيب.'}
+    },
+    fusion: {
+      formula: 'in + la = nella',
+      result: 'nella',
+      rule: 'مؤنث مفرد يبدأ بساكن',
+      explanation: 'borsa مؤنث (la borsa)، وحرف الجر in مع la يتدمجان ويصبحان nella'
+    },
+    expression: {
+      it: 'nella borsa',
+      ar: 'في الحقيبة',
+      sentences: [
+        {it: 'Le chiavi sono nella borsa.', ar: 'المفاتيح في الحقيبة.'},
+        {it: 'Metto il telefono nella borsa.', ar: 'أضع الهاتف في الحقيبة.'},
+        {it: 'Cerco nella borsa.', ar: 'أبحث في الحقيبة.'}
+      ]
+    },
+    stage: 2
+  },
+  // ═══════════════════════════ مجموعة DEL (di + il) ═══════════════════════════
+  {
+    id: 'del_pane',
+    vocab: {
+      word: 'pane',
+      ar: 'خبز',
+      gender: 'maschile',
+      article: 'il',
+      starts_with: 'consonant',
+      example: {it: 'Il pane è fresco.', ar: 'الخبز طازج.'}
+    },
+    prep: {
+      letter: 'di',
+      meaning: 'من / بعض',
+      why_here: 'di تستخدم للتعبير عن "بعض من" أو الملكية',
+      example: {it: 'Un bicchiere di acqua.', ar: 'كوب من الماء.'}
+    },
+    fusion: {
+      formula: 'di + il = del',
+      result: 'del',
+      rule: 'مذكر مفرد يبدأ بساكن عادي',
+      explanation: 'pane مذكر (il pane)، وحرف الجر di مع il يتدمجان ويصبحان del'
+    },
+    expression: {
+      it: 'del pane',
+      ar: 'بعض الخبز / من الخبز',
+      sentences: [
+        {it: 'Voglio del pane.', ar: 'أريد بعض الخبز.'},
+        {it: 'Compro del pane.', ar: 'أشتري خبزا.'},
+        {it: 'Il prezzo del pane.', ar: 'سعر الخبز.'}
+      ]
+    },
+    stage: 1
+  },
+  // ═══════════════════════════ مجموعة ALL' (a + l') ═══════════════════════════
+  {
+    id: 'all_universita',
+    vocab: {
+      word: 'universita',
+      ar: 'جامعة',
+      gender: 'femminile',
+      article: "l'",
+      starts_with: 'vowel',
+      example: {it: "L'universita e grande.", ar: 'الجامعة كبيرة.'}
+    },
+    prep: {
+      letter: 'a',
+      meaning: 'إلى / في',
+      why_here: 'لأننا نذهب إلى مكان (الجامعة)',
+      example: {it: 'Vado a Roma.', ar: 'أذهب إلى روما.'}
+    },
+    fusion: {
+      formula: "a + l' = all'",
+      result: "all'",
+      rule: 'مفرد يبدأ بحرف متحرك',
+      explanation: "universita تبدأ بـ U (متحرك) فتأخذ l'، وحرف الجر a مع l' يتدمجان ويصبحان all'"
+    },
+    expression: {
+      it: "all'universita",
+      ar: 'إلى الجامعة / في الجامعة',
+      sentences: [
+        {it: "Vado all'universita.", ar: 'أذهب إلى الجامعة.'},
+        {it: "Studio all'universita.", ar: 'أدرس في الجامعة.'},
+        {it: "Lavoro all'universita.", ar: 'أعمل في الجامعة.'}
+      ]
+    },
+    stage: 2
+  },
+  // ═══════════════════════════ مجموعة ALLO (a + lo) ═══════════════════════════
+  {
+    id: 'allo_stadio',
+    vocab: {
+      word: 'stadio',
+      ar: 'ملعب',
+      gender: 'maschile',
+      article: 'lo',
+      starts_with: 's_impure',
+      example: {it: 'Lo stadio e pieno.', ar: 'الملعب ممتلئ.'}
+    },
+    prep: {
+      letter: 'a',
+      meaning: 'إلى / في',
+      why_here: 'لأننا نذهب إلى مكان (الملعب)',
+      example: {it: 'Vado a vedere la partita.', ar: 'أذهب لمشاهدة المباراة.'}
+    },
+    fusion: {
+      formula: 'a + lo = allo',
+      result: 'allo',
+      rule: 'مذكر يبدأ بـ s+ساكن أو z',
+      explanation: 'stadio يبدأ بـ st (s+ساكن) فيأخذ lo، وحرف الجر a مع lo يتدمجان ويصبحان allo'
+    },
+    expression: {
+      it: 'allo stadio',
+      ar: 'إلى الملعب / في الملعب',
+      sentences: [
+        {it: 'Vado allo stadio.', ar: 'أذهب إلى الملعب.'},
+        {it: 'Sono allo stadio.', ar: 'أنا في الملعب.'},
+        {it: 'Ci vediamo allo stadio.', ar: 'نلتقي في الملعب.'}
+      ]
+    },
+    stage: 3
+  }
+];
+
+/* ─── وظائف مساعدة للـ LEARNING UNITS ─── */
+function getLearningUnitsByStage(stage) {
+  return LEARNING_UNITS.filter(u => u.stage === stage);
+}
+
+function buildLayeredQueue(unit) {
+  // بناء طابور الأسئلة المتدرج لوحدة تعليمية واحدة
+  let queue = [];
+  
+  // الطبقة 1: الكلمة
+  queue.push({type: 'layer1_show_word', unit: unit});
+  queue.push({type: 'layer1_mcq_meaning', unit: unit});
+  queue.push({type: 'layer1_mcq_gender', unit: unit});
+  
+  // الطبقة 2: حرف الجر
+  queue.push({type: 'layer2_show_prep', unit: unit});
+  queue.push({type: 'layer2_mcq_prep_meaning', unit: unit});
+  queue.push({type: 'layer2_mcq_why_prep', unit: unit});
+  
+  // الطبقة 3: منطق الدمج
+  queue.push({type: 'layer3_show_fusion', unit: unit});
+  queue.push({type: 'layer3_mcq_fusion_result', unit: unit});
+  queue.push({type: 'layer3_explain_why', unit: unit});
+  
+  // الطبقة 4: التطبيق
+  queue.push({type: 'layer4_fill_blank_hint', unit: unit});
+  queue.push({type: 'layer4_write_expression', unit: unit});
+  queue.push({type: 'layer4_translate', unit: unit});
+  
+  return queue;
+}
+
+
 
 
 function buildSetQueue(id, stage) {
@@ -646,32 +1330,75 @@ function buildSetQueue(id, stage) {
       });
     }
   } else if (id === 'G') {
-    // Preposizioni Articolate — 35 صيغة
-    // Stage 1: A articolate (al-alle) — see + mcq_ar + mcq_it
-    // Stage 2: DA + IN articolate — see + mcq_ar + mcq_it
-    // Stage 3: SU + DI articolate — see + mcq_it + write
-    const G_A  = SET_G_CHUNKS.slice(0,7);
-    const G_DA = SET_G_CHUNKS.slice(7,14);
-    const G_IN = SET_G_CHUNKS.slice(14,21);
-    const G_SU = SET_G_CHUNKS.slice(21,28);
-    const G_DI = SET_G_CHUNKS.slice(28,35);
+    // Preposizioni Articolate — 35 صيغة — 5 stages
+    // IL: AL DAL NEL SUL DEL
+    const G_IL  = SET_G_CHUNKS.filter(x=>['AL','DAL','NEL','SUL','DEL'].includes(x.it));
+    // LA: ALLA DALLA NELLA SULLA DELLA
+    const G_LA  = SET_G_CHUNKS.filter(x=>['ALLA','DALLA','NELLA','SULLA','DELLA'].includes(x.it));
+    // L': ALL' DALL' NELL' SULL' DELL'
+    const G_LP  = SET_G_CHUNKS.filter(x=>["ALL'","DALL'","NELL'","SULL'","DELL'"].includes(x.it));
+    // LO: ALLO DALLO NELLO SULLO DELLO
+    const G_LO  = SET_G_CHUNKS.filter(x=>['ALLO','DALLO','NELLO','SULLO','DELLO'].includes(x.it));
+    // الجمع: AI AGLI ALLE DAI DAGLI DALLE NEI NEGLI NELLE SUI SUGLI SULLE DEI DEGLI DELLE
+    const G_PLU = SET_G_CHUNKS.filter(x=>['AI','AGLI','ALLE','DAI','DAGLI','DALLE','NEI','NEGLI','NELLE','SUI','SUGLI','SULLE','DEI','DEGLI','DELLE'].includes(x.it));
+
+    const ctxFor = (st) => shuffle(CONTEXT_SENTENCES.filter(s=>s.stage===st));
+    const getPool = (group) => [...group, ...shuffle(SET_G_CHUNKS.filter(x=>!group.includes(x))).slice(0,4)];
+
     if(stage===1) {
-      shuffle(G_A).forEach(c => {
-        queue.push({type:'see',    chunk:c, pool:SET_G_CHUNKS});
-        queue.push({type:'mcq_ar', chunk:c, pool:SET_G_CHUNKS});
-        queue.push({type:'mcq_it', chunk:c, pool:SET_G_CHUNKS});
+      // IL: see + mcq_ar + decompose + combine + mcq_it + fill_blank
+      shuffle(G_IL).forEach(ch => {
+        queue.push({type:'see',       chunk:ch, pool:getPool(G_IL)});
+        queue.push({type:'mcq_ar',    chunk:ch, pool:getPool(G_IL)});
+        queue.push({type:'setG_decompose', chunk:ch});
+        queue.push({type:'setG_combine',   chunk:ch});
+        queue.push({type:'mcq_it',    chunk:ch, pool:getPool(G_IL)});
       });
+      ctxFor(1).forEach(s => queue.push({type:'setG_fill_blank', sentence:s}));
+
     } else if(stage===2) {
-      shuffle([...G_DA,...G_IN]).forEach(c => {
-        queue.push({type:'see',    chunk:c, pool:SET_G_CHUNKS});
-        queue.push({type:'mcq_ar', chunk:c, pool:SET_G_CHUNKS});
-        queue.push({type:'mcq_it', chunk:c, pool:SET_G_CHUNKS});
+      // LA + L': see + mcq_ar + decompose + context_pick + combine
+      shuffle([...G_LA,...G_LP]).forEach(ch => {
+        queue.push({type:'see',            chunk:ch, pool:getPool([...G_LA,...G_LP])});
+        queue.push({type:'mcq_ar',         chunk:ch, pool:getPool([...G_LA,...G_LP])});
+        queue.push({type:'setG_decompose', chunk:ch});
+        queue.push({type:'setG_combine',   chunk:ch});
       });
+      ctxFor(2).forEach(s => queue.push({type:'setG_context_pick', sentence:s, pool:[...G_LA,...G_LP]}));
+
+    } else if(stage===3) {
+      // LO: see + mcq_it + decompose + combine + context_pick
+      shuffle(G_LO).forEach(ch => {
+        queue.push({type:'see',            chunk:ch, pool:getPool(G_LO)});
+        queue.push({type:'mcq_it',         chunk:ch, pool:getPool(G_LO)});
+        queue.push({type:'setG_decompose', chunk:ch});
+        queue.push({type:'setG_combine',   chunk:ch});
+      });
+      ctxFor(3).forEach(s => queue.push({type:'setG_fill_blank', sentence:s}));
+
+    } else if(stage===4) {
+      // الجمع: mcq_ar + decompose + context_pick + fill_blank
+      shuffle(G_PLU).forEach(ch => {
+        queue.push({type:'mcq_ar',         chunk:ch, pool:getPool(G_PLU)});
+        queue.push({type:'setG_decompose', chunk:ch});
+        queue.push({type:'mcq_it',         chunk:ch, pool:getPool(G_PLU)});
+      });
+      ctxFor(4).forEach(s => queue.push({type:'setG_context_pick', sentence:s, pool:G_PLU}));
+      ctxFor(4).forEach(s => queue.push({type:'setG_fill_blank', sentence:s}));
+
     } else {
-      shuffle([...G_SU,...G_DI]).forEach(c => {
-        queue.push({type:'see',    chunk:c, pool:SET_G_CHUNKS});
-        queue.push({type:'mcq_it', chunk:c, pool:SET_G_CHUNKS});
-        queue.push({type:'write',  chunk:c});
+      // Stage 5: مراجعة مختلطة — context_pick + fill_blank + sentence_translate + mistakes_quiz
+      shuffle([...CONTEXT_SENTENCES]).forEach(s => {
+        queue.push({type:'setG_context_pick', sentence:s, pool:SET_G_CHUNKS});
+      });
+      CONTEXT_SENTENCES.filter(s=>s.stage<=2).forEach(s => {
+        queue.push({type:'setG_sentence_translate', sentence:s});
+      });
+      CONTEXT_SENTENCES.filter(s=>s.stage>=3).forEach(s => {
+        queue.push({type:'setG_fill_blank', sentence:s});
+      });
+      shuffle(COMMON_MISTAKES).slice(0,5).forEach(m => {
+        queue.push({type:'setG_mistakes_quiz', mistake:m});
       });
     }
   }
@@ -1037,6 +1764,427 @@ function renderQuestion() {
     setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
   }
 
+  /* ══ SET G — DECOMPOSE ══ */
+  else if (qItem.type === 'setG_decompose') {
+    let ch = qItem.chunk;
+    let safeIt = ch.it.replace(/'/g,"\'");
+    // show examples
+    let exHtml = ch.examples ? `<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:14px;">
+      ${ch.examples.map(e=>`<div style="background:#e3f2fd;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:700;direction:ltr;color:var(--blue);">${e.it} <span style="color:var(--muted);direction:rtl;">${e.ar}</span></div>`).join('')}
+    </div>` : '';
+    html += `<h2 class="q-title">فك هذه الصيغة 🔍</h2>
+      <div class="word-card" onclick="playTTS('${safeIt}')" style="font-size:42px;">${ch.it} 🔊</div>
+      ${exHtml}
+      <div class="hint-box">📌 مثال: NEL = <b dir="ltr">in + il</b> | ALLA = <b dir="ltr">a + la</b></div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="حرف الجر + أداة التعريف  (مثال: a + il)" dir="ltr">`;
+    qc.innerHTML = html;
+    currentItem.cx = ch.decomp;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — COMBINE ══ */
+  else if (qItem.type === 'setG_combine') {
+    let ch = qItem.chunk;
+    let prepPart = ch.prep;
+    let artPart  = ch.art;
+    let exHtml = ch.examples && ch.examples[0]
+      ? `<div class="hint-box" style="margin-bottom:12px;">📌 مثال على الاستخدام: <b dir="ltr">${ch.examples[0].it}</b> — ${ch.examples[0].ar}</div>`
+      : '';
+    html += `<h2 class="q-title">ادمج وكوِّن الصيغة 🔗</h2>
+      <div class="word-card word-card-ar" style="font-size:26px;direction:ltr;"><b>${prepPart}</b> + <b>${artPart}</b> = <span style="color:var(--muted);">?</span></div>
+      ${exHtml}
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="الصيغة المدمجة..." dir="ltr" style="text-transform:uppercase;">`;
+    qc.innerHTML = html;
+    currentItem.cx = ch.it.toLowerCase();
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — FILL BLANK ══ */
+  else if (qItem.type === 'setG_fill_blank') {
+    let s = qItem.sentence;
+    let blank = s.blank.replace('___', '<span style="color:var(--blue);font-weight:900;text-decoration:underline dotted 2px;font-size:28px;">___</span>');
+    html += `<h2 class="q-title">املأ الفراغ 📝</h2>
+      <div class="word-card word-card-ar" style="font-size:22px;direction:ltr;text-align:center;">${blank}</div>
+      <div style="text-align:center;font-size:15px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${s.ar}</div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="الصيغة المناسبة..." dir="ltr">`;
+    qc.innerHTML = html;
+    currentItem.cx = s.answer;
+    currentItem.gSentence = s;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — CONTEXT PICK ══ */
+  else if (qItem.type === 'setG_context_pick') {
+    let s = qItem.sentence;
+    let pool = qItem.pool || SET_G_CHUNKS;
+    // distractors from same prep
+    let samePrepPool = pool.filter(x=>x.prep===s.prep && x.it.toLowerCase()!==s.answer);
+    let diffPool     = pool.filter(x=>x.prep!==s.prep && x.it.toLowerCase()!==s.answer);
+    let distractors  = shuffle([...samePrepPool,...diffPool]).slice(0,3).map(x=>x.it.toLowerCase());
+    // ensure 4 unique options
+    let opts = shuffle([s.answer, ...distractors.slice(0,3)]);
+    // if not 4 unique, pad
+    let allOpts = pool.map(x=>x.it.toLowerCase()).filter(x=>x!==s.answer);
+    while(opts.length < 4) { let o = allOpts.find(x=>!opts.includes(x)); if(!o) break; opts.push(o); }
+    opts = shuffle(opts.slice(0,4));
+    let blank = s.blank.replace('___', '<span style="color:var(--blue);font-weight:900;font-size:28px;">___</span>');
+    html += `<h2 class="q-title">اختر الصيغة الصحيحة ✅</h2>
+      <div class="word-card word-card-ar" style="font-size:22px;direction:ltr;text-align:center;">${blank}</div>
+      <div style="text-align:center;font-size:15px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${s.ar}</div>
+      <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+        ${opts.map(o=>`<div class="mcq-opt" dir="ltr" style="font-size:20px;font-weight:900;" data-ans="${o}" onclick="chkOpt(this,'${s.answer}')">${o}</div>`).join('')}
+      </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = s.answer;
+    currentItem.gSentence = s;
+  }
+
+  /* ══ SET G — SENTENCE TRANSLATE ══ */
+  else if (qItem.type === 'setG_sentence_translate') {
+    let s = qItem.sentence;
+    html += `<h2 class="q-title">ترجم إلى الإيطالية 🇮🇹</h2>
+      <div class="word-card word-card-ar">${s.ar}</div>
+      <div class="hint-box" style="font-size:12px;">💡 ركز على الصيغة المدمجة: <b dir="ltr">${s.prep} + ${s.art} = ${s.answer}</b></div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="اكتب الجملة كاملة..." dir="ltr">`;
+    qc.innerHTML = html;
+    currentItem.cx = s.full.toLowerCase().replace(/[.,!?]/g,'');
+    currentItem.gSentence = s;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — MISTAKES QUIZ ══ */
+  else if (qItem.type === 'setG_mistakes_quiz') {
+    let m = qItem.mistake;
+    let opts = shuffle([m.correct, m.wrong]);
+    html += `<h2 class="q-title">ما الصيغة الصحيحة؟ ⚠️</h2>
+      <div class="hint-box" style="background:#fff3e0;border-color:var(--orange);">🚫 خطأ شائع — اختر الصواب</div>
+      <div class="mcq-grid">
+        ${opts.map(o=>`<div class="mcq-opt" dir="ltr" style="font-size:18px;font-weight:800;" data-ans="${o.replace(/"/g,'&quot;')}" onclick="chkOpt(this,'${m.correct.replace(/'/g,"\'")}')">${o}</div>`).join('')}
+      </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = m.correct;
+    currentItem.gMistake = m;
+  }
+
+  /* ═══════════════════════════ LAYER 1: الكلمة (VOCABULARY) ═══════════════════════════ */
+  
+  // عرض الكلمة ومعناها
+  else if (qItem.type === 'layer1_show_word') {
+    let u = qItem.unit;
+    let v = u.vocab;
+    let genderIcon = v.gender === 'maschile' ? '🚹' : '🚺';
+    let genderText = v.gender === 'maschile' ? 'مذكر' : 'مؤنث';
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--teal);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 1 — الكلمة</span>
+      </div>
+      <h2 class="q-title">تعرّف على الكلمة الأساسية</h2>
+      <div class="word-card" style="font-size:42px;cursor:pointer;" onclick="playTTS('${v.article} ${v.word}')">${v.word} 🔊</div>
+      <div style="text-align:center;font-size:24px;font-weight:800;color:var(--text);margin-bottom:12px;">${v.ar}</div>
+      <div style="display:flex;justify-content:center;gap:12px;margin-bottom:16px;">
+        <span style="background:var(--blue-lt);color:var(--blue);padding:6px 14px;border-radius:10px;font-weight:800;font-size:14px;">${genderIcon} ${genderText}</span>
+        <span style="background:var(--bg);color:var(--text);padding:6px 14px;border-radius:10px;font-weight:800;font-size:14px;direction:ltr;">${v.article} ${v.word}</span>
+      </div>
+      <div class="hint-box" style="text-align:center;">
+        <b dir="ltr">${v.example.it}</b><br>
+        <span style="color:var(--muted);">${v.example.ar}</span>
+      </div>
+    `;
+    qc.innerHTML = html;
+    $('main-btn').textContent = "فهمت، تابع ←";
+    waiting = true;
+    playTTS(v.article + ' ' + v.word);
+  }
+  
+  // سؤال عن معنى الكلمة
+  else if (qItem.type === 'layer1_mcq_meaning') {
+    let u = qItem.unit;
+    let v = u.vocab;
+    // خيارات من وحدات أخرى
+    let otherUnits = shuffle(LEARNING_UNITS.filter(x => x.id !== u.id)).slice(0, 3);
+    let opts = shuffle([v.ar, ...otherUnits.map(x => x.vocab.ar)]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--teal);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 1 — الكلمة</span>
+      </div>
+      <h2 class="q-title">ما معنى هذه الكلمة؟</h2>
+      <div class="word-card" onclick="playTTS('${v.word}')">${v.word} 🔊</div>
+      <div class="mcq-grid">
+        ${opts.map(o => `<div class="mcq-opt" data-ans="${o}" onclick="chkOpt(this, '${v.ar}', true)">${o.split('/')[0]}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = v.ar;
+    playTTS(v.word);
+  }
+  
+  // سؤال عن جنس الكلمة
+  else if (qItem.type === 'layer1_mcq_gender') {
+    let u = qItem.unit;
+    let v = u.vocab;
+    let cx = v.gender === 'maschile' ? 'm' : 'f';
+    let artHint = v.article;
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--teal);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 1 — الكلمة</span>
+      </div>
+      <h2 class="q-title">ما جنس كلمة "${v.word}"؟</h2>
+      <div class="word-card" onclick="playTTS('${v.article} ${v.word}')">${v.word} 🔊</div>
+      <div style="text-align:center;font-size:16px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${v.ar}</div>
+      <div class="hint-box">💡 فكّر: أداة التعريف هي <b dir="ltr">${artHint}</b></div>
+      <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="mcq-opt" style="font-size:20px;" data-ans="m" onclick="chkOpt(this,'${cx}', true)">مذكر 🚹<br><span dir="ltr" style="font-size:13px;opacity:.7;">il / lo / l'</span></div>
+        <div class="mcq-opt" style="font-size:20px;" data-ans="f" onclick="chkOpt(this,'${cx}', true)">مؤنث 🚺<br><span dir="ltr" style="font-size:13px;opacity:.7;">la / l'</span></div>
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = cx;
+  }
+  
+  /* ═══════════════════════════ LAYER 2: حرف الجر (PREPOSITION) ═══════════════════════════ */
+  
+  // عرض حرف الجر ومعناه
+  else if (qItem.type === 'layer2_show_prep') {
+    let u = qItem.unit;
+    let p = u.prep;
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--blue);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 2 — حرف الجر</span>
+      </div>
+      <h2 class="q-title">تعرّف على حرف الجر</h2>
+      <div class="word-card" style="font-size:56px;color:var(--purple);" onclick="playTTS('${p.letter}')">${p.letter.toUpperCase()} 🔊</div>
+      <div style="text-align:center;font-size:22px;font-weight:800;color:var(--text);margin-bottom:14px;">${p.meaning}</div>
+      <div class="hint-box" style="text-align:right;line-height:1.8;">
+        <b>لماذا نستخدمه هنا؟</b><br>
+        ${p.why_here}<br><br>
+        <b>مثال:</b><br>
+        <span dir="ltr" style="color:var(--blue);font-weight:900;">${p.example.it}</span><br>
+        <span style="color:var(--muted);">${p.example.ar}</span>
+      </div>
+    `;
+    qc.innerHTML = html;
+    $('main-btn').textContent = "فهمت، تابع ←";
+    waiting = true;
+    playTTS(p.letter);
+  }
+  
+  // سؤال عن معنى حرف الجر
+  else if (qItem.type === 'layer2_mcq_prep_meaning') {
+    let u = qItem.unit;
+    let p = u.prep;
+    let prepMeanings = {
+      'a': 'إلى / في',
+      'da': 'من / عند',
+      'in': 'في / بـ',
+      'su': 'على',
+      'di': 'من / لـ'
+    };
+    let opts = shuffle(Object.values(prepMeanings));
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--blue);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 2 — حرف الجر</span>
+      </div>
+      <h2 class="q-title">ما معنى حرف الجر "${p.letter.toUpperCase()}"؟</h2>
+      <div class="word-card" style="font-size:56px;color:var(--purple);" onclick="playTTS('${p.letter}')">${p.letter.toUpperCase()} 🔊</div>
+      <div class="mcq-grid">
+        ${opts.map(o => `<div class="mcq-opt" data-ans="${o}" onclick="chkOpt(this, '${p.meaning}', true)">${o}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = p.meaning;
+  }
+  
+  // سؤال لماذا نستخدم هذا الحرف
+  else if (qItem.type === 'layer2_mcq_why_prep') {
+    let u = qItem.unit;
+    let p = u.prep;
+    let v = u.vocab;
+    let whyOptions = [
+      'لأننا نذهب إلى مكان (وجهة)',
+      'لأننا نعود من مكان (مصدر)',
+      'لأن الشيء فوق سطح ما',
+      'لأننا داخل مكان مغلق',
+      'للتعبير عن الملكية أو البعضية'
+    ];
+    let opts = shuffle([p.why_here, ...whyOptions.filter(x => x !== p.why_here).slice(0,3)]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--blue);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 2 — حرف الجر</span>
+      </div>
+      <h2 class="q-title">لماذا نستخدم "${p.letter.toUpperCase()}" مع "${v.word}"؟</h2>
+      <div style="display:flex;justify-content:center;gap:10px;margin-bottom:16px;">
+        <span class="word-card" style="font-size:28px;padding:12px 20px;color:var(--purple);">${p.letter}</span>
+        <span style="font-size:28px;font-weight:900;color:var(--muted);align-self:center;">+</span>
+        <span class="word-card" style="font-size:28px;padding:12px 20px;">${v.word}</span>
+      </div>
+      <div class="mcq-grid">
+        ${opts.map(o => `<div class="mcq-opt" style="font-size:14px;text-align:right;line-height:1.5;" data-ans="${o}" onclick="chkOpt(this, '${p.why_here}', true)">${o}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = p.why_here;
+  }
+  
+  /* ═══════════════════════════ LAYER 3: منطق الدمج (FUSION) ═══════════════════════════ */
+  
+  // عرض كيفية الدمج
+  else if (qItem.type === 'layer3_show_fusion') {
+    let u = qItem.unit;
+    let f = u.fusion;
+    let v = u.vocab;
+    let p = u.prep;
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--purple);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 3 — الدمج</span>
+      </div>
+      <h2 class="q-title">كيف يحدث الدمج؟</h2>
+      <div style="text-align:center;padding:20px;background:linear-gradient(135deg,#f0f7ff,#fff);border-radius:16px;border:2px solid var(--blue-lt);margin-bottom:16px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:16px;">
+          <span style="font-size:32px;font-weight:900;color:var(--purple);background:#f3e5f5;padding:10px 18px;border-radius:12px;">${p.letter}</span>
+          <span style="font-size:28px;font-weight:900;color:var(--muted);">+</span>
+          <span style="font-size:32px;font-weight:900;color:var(--blue);background:var(--blue-lt);padding:10px 18px;border-radius:12px;">${v.article}</span>
+        </div>
+        <div style="font-size:28px;color:var(--muted);margin-bottom:10px;">↓</div>
+        <div style="font-size:42px;font-weight:900;color:var(--green);background:#e8f5e9;padding:12px 24px;border-radius:14px;display:inline-block;" onclick="playTTS('${f.result}')">${f.result.toUpperCase()} 🔊</div>
+      </div>
+      <div class="hint-box" style="text-align:right;line-height:1.8;">
+        <b>القاعدة:</b> ${f.rule}<br><br>
+        <b>الشرح:</b> ${f.explanation}
+      </div>
+    `;
+    qc.innerHTML = html;
+    $('main-btn').textContent = "فهمت، تابع ←";
+    waiting = true;
+    playTTS(f.result);
+  }
+  
+  // سؤال عن نتيجة الدمج
+  else if (qItem.type === 'layer3_mcq_fusion_result') {
+    let u = qItem.unit;
+    let f = u.fusion;
+    let v = u.vocab;
+    let p = u.prep;
+    // خيارات من صيغ مدمجة أخرى
+    let allResults = LEARNING_UNITS.map(x => x.fusion.result.toLowerCase());
+    let uniqueResults = [...new Set(allResults)].filter(x => x !== f.result.toLowerCase());
+    let opts = shuffle([f.result.toLowerCase(), ...shuffle(uniqueResults).slice(0,3)]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--purple);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 3 — الدمج</span>
+      </div>
+      <h2 class="q-title">ما نتيجة الدمج؟</h2>
+      <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:20px;">
+        <span style="font-size:32px;font-weight:900;color:var(--purple);background:#f3e5f5;padding:10px 18px;border-radius:12px;">${p.letter}</span>
+        <span style="font-size:28px;font-weight:900;color:var(--muted);">+</span>
+        <span style="font-size:32px;font-weight:900;color:var(--blue);background:var(--blue-lt);padding:10px 18px;border-radius:12px;">${v.article}</span>
+        <span style="font-size:28px;font-weight:900;color:var(--muted);">=</span>
+        <span style="font-size:32px;font-weight:900;color:var(--green);">?</span>
+      </div>
+      <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+        ${opts.map(o => `<div class="mcq-opt" dir="ltr" style="font-size:24px;font-weight:900;text-transform:uppercase;" data-ans="${o}" onclick="chkOpt(this, '${f.result.toLowerCase()}', true)">${o}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = f.result.toLowerCase();
+  }
+  
+  // سؤال لماذا هذه النتيجة وليس غيرها
+  else if (qItem.type === 'layer3_explain_why') {
+    let u = qItem.unit;
+    let f = u.fusion;
+    let v = u.vocab;
+    let ruleOptions = [
+      'مذكر مفرد يبدأ بساكن عادي',
+      'مؤنث مفرد يبدأ بساكن',
+      'مفرد يبدأ بحرف متحرك',
+      'مذكر يبدأ بـ s+ساكن أو z',
+      'جمع مذكر عادي',
+      'جمع مؤنث'
+    ];
+    let opts = shuffle([f.rule, ...ruleOptions.filter(x => x !== f.rule).slice(0,3)]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--purple);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 3 — الدمج</span>
+      </div>
+      <h2 class="q-title">لماذا نستخدم "${f.result.toUpperCase()}" وليس صيغة أخرى؟</h2>
+      <div style="text-align:center;margin-bottom:16px;">
+        <span style="font-size:18px;color:var(--muted);">الكلمة:</span>
+        <span style="font-size:22px;font-weight:900;color:var(--blue);margin:0 8px;" dir="ltr">${v.article} ${v.word}</span>
+      </div>
+      <div class="hint-box" style="margin-bottom:16px;">💡 فكّر في: جنس الكلمة، نوع الحرف الذي تبدأ به</div>
+      <div class="mcq-grid">
+        ${opts.map(o => `<div class="mcq-opt" style="font-size:14px;text-align:right;" data-ans="${o}" onclick="chkOpt(this, '${f.rule}', true)">${o}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = f.rule;
+  }
+  
+  /* ═══════════════════════════ LAYER 4: التطبيق (APPLICATION) ═══════════════════════════ */
+  
+  // املأ الفراغ مع تلميح
+  else if (qItem.type === 'layer4_fill_blank_hint') {
+    let u = qItem.unit;
+    let e = u.expression;
+    let f = u.fusion;
+    let sentence = e.sentences[0];
+    let blank = sentence.it.replace(new RegExp(f.result, 'i'), '<span style="color:var(--blue);font-weight:900;text-decoration:underline dotted 2px;font-size:24px;">___</span>');
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--green);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 4 — التطبيق</span>
+      </div>
+      <h2 class="q-title">املأ الفراغ</h2>
+      <div class="word-card word-card-ar" style="font-size:20px;direction:ltr;text-align:center;">${blank}</div>
+      <div style="text-align:center;font-size:15px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${sentence.ar}</div>
+      <div class="hint-box" style="text-align:center;">💡 تلميح: <b dir="ltr">${f.formula}</b></div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="الصيغة المدمجة..." dir="ltr" style="text-transform:lowercase;">
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = f.result.toLowerCase();
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+  
+  // اكتب التعبير الكامل
+  else if (qItem.type === 'layer4_write_expression') {
+    let u = qItem.unit;
+    let e = u.expression;
+    let v = u.vocab;
+    let f = u.fusion;
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--green);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 4 — التطبيق</span>
+      </div>
+      <h2 class="q-title">اكتب التعبير الكامل</h2>
+      <div class="word-card word-card-ar" style="font-size:22px;">${e.ar.split('/')[0]}</div>
+      <div class="hint-box" style="text-align:center;">
+        الكلمة: <b dir="ltr">${v.word}</b> | حرف الجر: <b dir="ltr">${u.prep.letter}</b>
+      </div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="اكتب بالإيطالية..." dir="ltr">
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = e.it.toLowerCase();
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+  
+  // ترجمة جملة كاملة
+  else if (qItem.type === 'layer4_translate') {
+    let u = qItem.unit;
+    let e = u.expression;
+    let sentence = e.sentences[Math.floor(Math.random() * e.sentences.length)];
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--green);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 4 — التطبيق</span>
+      </div>
+      <h2 class="q-title">ترجم إلى الإيطالية</h2>
+      <div class="word-card word-card-ar" style="font-size:20px;">${sentence.ar}</div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="اكتب الجملة كاملة..." dir="ltr">
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = sentence.it.toLowerCase().replace(/[.,!?]/g,'');
+    currentItem.fullSentence = sentence;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
   // -- SET A TYPES --
   else if (qItem.type === 'setA_id') {
     let w = qItem.word;
@@ -1316,7 +2464,8 @@ function handleMain() {
   if (currentItem.type==='see') {
     sessionStats.c++; moveNext(); return;
   }
-  if (!currentItem.type.includes('write')) return;
+  const G_INPUT_TYPES = ['setG_decompose','setG_combine','setG_fill_blank','setG_sentence_translate'];
+  if (!currentItem.type.includes('write') && !G_INPUT_TYPES.includes(currentItem.type)) return;
   
   let iNode = $('write-input');
 
@@ -1382,13 +2531,29 @@ function handleMain() {
     return;
   }
 
-  let passed = norm(iNode.value) === norm(currentItem.cx);
+  let passed = false;
+  let _t = currentItem.type;
+  let _userVal = iNode.value;
+  let _correctVal = currentItem.cx;
+
+  if(_t === 'setG_decompose') {
+    passed = normDecomp(_userVal) === normDecomp(_correctVal);
+  } else if(_t === 'setG_combine') {
+    passed = normCombine(_userVal) === normCombine(_correctVal);
+  } else if(_t === 'setG_sentence_translate') {
+    let _u = norm(_userVal); let _cv = norm(_correctVal);
+    let _s = currentItem.gSentence;
+    passed = _u === _cv || (_s && _u.includes(norm(_s.answer)) && _u.includes(norm(_s.prep)));
+  } else {
+    passed = norm(_userVal) === norm(_correctVal);
+  }
+
   iNode.style.borderColor = passed ? 'var(--green)' : 'var(--red)';
   iNode.style.background = passed ? '#e8f5e9' : 'var(--red-lt)';
   
   if(passed && appState.tts) {
     let tw = currentItem.sTts || currentItem.chunk?.it;
-    playTTS(tw);
+    if(tw) playTTS(tw);
   }
 
   triggerFeedback(passed, currentItem.cx);
@@ -1473,6 +2638,51 @@ function triggerFeedback(passed, ctext) {
     const artRules = {"il":"مذكر + ساكن عادي","lo":"مذكر + Z أو S+ساكن","la":"مؤنث + ساكن","l'":"يبدأ بمتحرك (مذكر أو مؤنث)"};
     let rule = artRules[ctext] || '';
     if(rule) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.6; font-weight:600; color:#333;">💡 <b dir="ltr">${ctext}</b> = ${rule}</div>`;
+
+  /* ── SET G EXPLANATIONS ── */
+  } else if (ci.type === 'setG_decompose') {
+    let ch = ci.chunk;
+    let exHtml = ch.examples
+      ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;">${ch.examples.map(e=>`<span style="background:#e3f2fd;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:700;direction:ltr;">${e.it} — ${e.ar}</span>`).join('')}</div>` : '';
+    explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${ch.it}</b> = <b dir="ltr">${ch.decomp}</b><br>
+      <span style="font-size:12px; color:var(--muted);">${ch.note}</span>
+      ${exHtml}
+    </div>`;
+  } else if (ci.type === 'setG_combine') {
+    let ch = ci.chunk;
+    let exHtml = ch.examples
+      ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;">${ch.examples.slice(0,2).map(e=>`<span style="background:#e3f2fd;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:700;direction:ltr;">${e.it} — ${e.ar}</span>`).join('')}</div>` : '';
+    explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${ch.prep}</b> + <b dir="ltr">${ch.art}</b> = <b dir="ltr" style="font-size:18px;color:var(--blue);">${ch.it}</b><br>
+      <span style="font-size:12px; color:var(--muted);">${ch.note}</span>
+      ${exHtml}
+    </div>`;
+  } else if (ci.type === 'setG_fill_blank' || ci.type === 'setG_context_pick') {
+    let s = ci.gSentence;
+    if(s) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${s.full}</b><br>
+      <span style="color:var(--muted); font-size:12px;">${s.ar}</span><br>
+      <span style="font-size:12px; color:var(--blue);">${s.prep} + ${s.art} = <b dir="ltr">${s.answer}</b></span>
+    </div>`;
+  } else if (ci.type === 'setG_sentence_translate') {
+    let s = ci.gSentence;
+    if(s) {
+      // highlight the combined form in the sentence
+      let highlighted = s.full.replace(s.answer, `<b style="color:var(--blue);font-size:16px;text-decoration:underline;">${s.answer}</b>`);
+      explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+        💡 <span dir="ltr">${highlighted}</span><br>
+        <span style="color:var(--muted); font-size:12px;">${s.ar}</span><br>
+        <span style="font-size:12px; color:var(--blue);">${s.prep} + ${s.art} = <b dir="ltr">${s.answer}</b></span>
+      </div>`;
+    }
+  } else if (ci.type === 'setG_mistakes_quiz') {
+    let m = ci.gMistake;
+    if(m) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      ✅ الصواب: <b dir="ltr">${m.correct}</b> | 🚫 الخطأ: <span style="color:var(--red);text-decoration:line-through;" dir="ltr">${m.wrong}</span><br>
+      <span style="font-size:12px; color:var(--orange);">📌 ${m.rule}</span><br>
+      <span style="font-size:12px; color:var(--muted);">${m.tip}</span>
+    </div>`;
   }
 
   fb.innerHTML = `<div style="display:flex; align-items:flex-start; gap:8px;">
@@ -1566,11 +2776,13 @@ function renderInfo() {
   let D = appState.sets.D || 0, isD_Done = D >= 3, next_D = Math.min(3, D + 1);
   let E = appState.sets.E || 0, e_lkd = !isB_Done, isE_Done = E >= 3, next_E = Math.min(3, E + 1);
   let F = appState.sets.F || 0, isF_Done = F >= 3, next_F = Math.min(3, F + 1);
-  let G = appState.sets.G || 0, g_lkd = F < 2  // G unlocks after F stage 2, isG_Done = G >= 3, next_G = Math.min(3, G + 1);
+  let G = appState.sets.G || 0; let g_lkd = F < 2; let isG_Done = G >= 5; let next_G = Math.min(5, G + 1);
+  let H = appState.sets.H || 0; let isH_Done = H >= 3; let next_H = Math.min(3, H + 1);
 
   // Replicating Cards:
   function RCard(iconT, clsIcon, stit, ssub, itTerm, progL, isLocked, isFin, f_stage, f_char) {
-    let lockDiv = isLocked ? `<span class="set-badge locked">مقفول 🔒</span>` : (isFin ? `<span class="set-badge done">مكتمل ✅</span>` : `<span class="set-badge prog">المرحلة ${f_stage}/3</span>`);
+    let maxStage = (f_char === 'G') ? 5 : 3;
+    let lockDiv = isLocked ? `<span class="set-badge locked">مقفول 🔒</span>` : (isFin ? `<span class="set-badge done">مكتمل ✅</span>` : `<span class="set-badge prog">المرحلة ${f_stage}/${maxStage}</span>`);
     return `
     <div class="set-card ${isFin?'done':''} ${isLocked?'locked':''}" onclick="if(!${isLocked}){startSetEnv('${f_char}', ${f_stage});}">
        <div style="display:flex; align-items:center;">
@@ -1594,8 +2806,44 @@ function renderInfo() {
       ${RCard('📝', 'icon-art', 'Set C — أداة التعريف', 'il / lo / la / l\' في المفرد', "L'Articolo Determinativo", C, c_lkd, isC_Done, next_C, 'C')}
       ${RCard('🏷️', 'icon-abc', 'Set D — أسماء المصطلحات', 'احفظ أسماء الأقسام بالإيطالي', 'Terminologia Grammaticale', D, false, isD_Done, next_D, 'D')}
       ${RCard('📚', 'icon-art', 'Set E — الجمع', 'المذكر والمؤنث في الجمع', 'Il Plurale: Maschile / Femminile', E, e_lkd, isE_Done, next_E, 'E')}
+      ${RCard('🔤', 'icon-abc', 'Set F — حروف الجر البسيطة', 'A · DI · DA · IN · SU · PER · CON · TRA', 'Preposizioni Semplici', F, false, isF_Done, next_F, 'F')}
+      ${RCard('🔗', 'icon-art', 'Set G — حروف الجر المدمجة', "AL · DELLA · NELL' · SUGLI ...", 'Preposizioni Articolate', G, g_lkd, isG_Done, next_G, 'G')}
     </div>
-    <button class="ghost-btn" style="margin-top:4px; font-size:13px; color:var(--red); border-color:var(--red);" onclick="confirmResetSets()">🔄 إعادة ضبط مستويات التمارين</button>
+    
+    <div style="margin-top:20px; padding:16px; background:linear-gradient(135deg, #e8f5e9, #f1f8e9); border-radius:14px; border:2px solid var(--green);">
+      <div style="text-align:center; margin-bottom:12px;">
+        <span style="background:var(--green); color:#fff; padding:5px 14px; border-radius:20px; font-size:12px; font-weight:800;">جديد - نظام التعلم المتدرج</span>
+      </div>
+      <h3 style="text-align:center; font-size:16px; font-weight:900; color:var(--text); margin-bottom:8px;">Set H — الطبقات الأربع</h3>
+      <p style="text-align:center; font-size:13px; color:var(--muted); font-weight:600; margin-bottom:14px; line-height:1.6;">
+        تعلم واقعي ومتدرج: الكلمة → حرف الجر → سبب الدمج → التطبيق
+      </p>
+      <div style="display:flex; justify-content:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+        <span style="background:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; color:var(--teal);">1. الكلمة</span>
+        <span style="color:var(--muted);">→</span>
+        <span style="background:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; color:var(--blue);">2. حرف الجر</span>
+        <span style="color:var(--muted);">→</span>
+        <span style="background:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; color:var(--purple);">3. الدمج</span>
+        <span style="color:var(--muted);">→</span>
+        <span style="background:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; color:var(--green);">4. التطبيق</span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="primary-btn" style="flex:1; margin:0;" onclick="startLayeredLearning(1)">
+          ${H >= 1 ? 'Stage 1: IL (al, dal, nel...)' : 'ابدأ Stage 1: IL'}
+        </button>
+      </div>
+      ${H >= 1 ? `
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="secondary-btn" style="flex:1; margin:0;" onclick="startLayeredLearning(2)">Stage 2: LA + L'</button>
+        ${H >= 2 ? `<button class="secondary-btn" style="flex:1; margin:0;" onclick="startLayeredLearning(3)">Stage 3: LO</button>` : ''}
+      </div>
+      ` : ''}
+      <div style="text-align:center; margin-top:10px;">
+        <span style="font-size:12px; color:var(--muted); font-weight:600;">التقدم: المرحلة ${next_H}/3</span>
+      </div>
+    </div>
+    
+    <button class="ghost-btn" style="margin-top:14px; font-size:13px; color:var(--red); border-color:var(--red);" onclick="confirmResetSets()">🔄 إعادة ضبط مستويات التمارين</button>
   `;
 
   // Combining Rules with pure html.
@@ -1689,9 +2937,106 @@ function confirmResetSets() {
 }
 
 function resetSets() {
-  appState.sets = {A:0, B:0, C:0, D:0, E:0, F:0, G:0};
+  appState.sets = {A:0, B:0, C:0, D:0, E:0, F:0, G:0, H:0};
   save();
   renderInfo();
+}
+
+/* ═══════════════════════════ LAYERED LEARNING SYSTEM ═══════════════════════════ */
+function startLayeredLearning(stage) {
+  sessionStats = {c:0, w:0};
+  
+  // فلترة الوحدات حسب المرحلة
+  let units = getLearningUnitsByStage(stage);
+  if(units.length === 0) {
+    // إذا لم توجد وحدات للمرحلة المطلوبة، استخدم كل الوحدات
+    units = LEARNING_UNITS.filter(u => u.stage <= stage);
+  }
+  
+  // بناء طابور الأسئلة المتدرج
+  let queue = [];
+  shuffle(units).forEach(unit => {
+    queue.push(...buildLayeredQueue(unit));
+  });
+  
+  session = { 
+    queue: queue, 
+    idx: 0, 
+    setId: 'H', 
+    setStage: stage,
+    isLayered: true 
+  };
+  
+  // عرض مقدمة المرحلة
+  let stageIntros = {
+    1: {
+      title: 'المرحلة 1 — أساسيات IL',
+      icon: '📘',
+      desc: 'سنتعلم الصيغ المدمجة مع أداة التعريف IL (مذكر مفرد يبدأ بساكن عادي)',
+      examples: ['al bar', 'dal dottore', 'nel parco', 'sul tavolo', 'del pane'],
+      formula: 'a/da/in/su/di + il = al/dal/nel/sul/del'
+    },
+    2: {
+      title: 'المرحلة 2 — LA و L\'',
+      icon: '📗',
+      desc: 'سنتعلم الصيغ المدمجة مع LA (مؤنث) و L\' (يبدأ بمتحرك)',
+      examples: ['alla stazione', 'dalla porta', 'nella borsa', "all'universita"],
+      formula: 'a/da/in/su/di + la/l\' = alla/dalla/nella/... / all\'/dall\'/nell\'...'
+    },
+    3: {
+      title: 'المرحلة 3 — LO والحالات الخاصة',
+      icon: '📙',
+      desc: 'سنتعلم الصيغ مع LO (يبدأ بـ s+ساكن أو z)',
+      examples: ['allo stadio', 'dallo studente', 'nello zaino', 'sullo schermo'],
+      formula: 'a/da/in/su/di + lo = allo/dallo/nello/sullo/dello'
+    }
+  };
+  
+  let intro = stageIntros[stage];
+  $('screen-end').innerHTML = `
+    <div style="padding:20px 14px;">
+      <div style="text-align:center; font-size:48px; margin-bottom:10px;">${intro.icon}</div>
+      <h2 class="q-title">${intro.title}</h2>
+      <p style="text-align:center; font-size:14px; color:var(--muted); font-weight:600; line-height:1.7; margin-bottom:16px;">
+        ${intro.desc}
+      </p>
+      <div class="hint-box" style="text-align:center; margin-bottom:16px;">
+        <b dir="ltr">${intro.formula}</b>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:20px;">
+        ${intro.examples.map(e => `<span style="background:var(--blue-lt); color:var(--blue); padding:5px 12px; border-radius:8px; font-size:13px; font-weight:700; direction:ltr;">${e}</span>`).join('')}
+      </div>
+      <div style="background:#f3e5f5; border-radius:12px; padding:14px; margin-bottom:20px;">
+        <h4 style="text-align:center; font-size:14px; font-weight:800; color:var(--purple); margin-bottom:10px;">كيف يعمل نظام الطبقات؟</h4>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:12px; color:var(--text); font-weight:600;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:var(--teal); color:#fff; padding:3px 8px; border-radius:6px; font-size:10px;">1</span>
+            <span>تتعرف على الكلمة ومعناها وجنسها</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:var(--blue); color:#fff; padding:3px 8px; border-radius:6px; font-size:10px;">2</span>
+            <span>تتعلم حرف الجر ولماذا نستخدمه</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:var(--purple); color:#fff; padding:3px 8px; border-radius:6px; font-size:10px;">3</span>
+            <span>تفهم كيف ولماذا يحدث الدمج</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:var(--green); color:#fff; padding:3px 8px; border-radius:6px; font-size:10px;">4</span>
+            <span>تطبق ما تعلمته في جمل حقيقية</span>
+          </div>
+        </div>
+      </div>
+      <button class="primary-btn" onclick="launchLayeredSession()">ابدأ التعلم المتدرج</button>
+      <button class="ghost-btn" onclick="renderInfo()">رجوع</button>
+    </div>
+  `;
+  showScreen('end');
+}
+
+function launchLayeredSession() {
+  renderQuestion();
+  showScreen('session');
 }
 
 // START EXECUTION ON LOAD
