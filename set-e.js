@@ -1,0 +1,80 @@
+const SET_E_WORDS = [
+  {it:'libro',    itP:'libri',    ar:'كتب',         artS:'il',  artP:'i',   rule:'-o → -i (مذكر)'},
+  {it:'porta',    itP:'porte',    ar:'أبواب',        artS:'la',  artP:'le',  rule:'-a → -e (مؤنث)'},
+  {it:'treno',    itP:'treni',    ar:'قطارات',       artS:'il',  artP:'i',   rule:'-o → -i (مذكر)'},
+  {it:'casa',     itP:'case',     ar:'منازل',        artS:'la',  artP:'le',  rule:'-a → -e (مؤنث)'},
+  {it:'amico',    itP:'amici',    ar:'أصدقاء (م)',   artS:"l'",  artP:'gli', rule:'-co → -ci | gli + متحرك'},
+  {it:'amica',    itP:'amiche',   ar:'صديقات',       artS:"l'",  artP:'le',  rule:'-ca → -che'},
+  {it:'studente', itP:'studenti', ar:'طلاب',         artS:'lo',  artP:'gli', rule:'-e → -i | gli + s_impure'},
+  {it:'padre',    itP:'padri',    ar:'آباء',         artS:'il',  artP:'i',   rule:'-e → -i (مذكر)'},
+  {it:'madre',    itP:'madri',    ar:'أمهات',        artS:'la',  artP:'le',  rule:'-e → -i (مؤنث)'},
+  {it:'caffè',    itP:'caffè',    ar:'قهاوي',        artS:'il',  artP:'i',   rule:'نهاية مضغوطة → لا تتغير'},
+  {it:'città',    itP:'città',    ar:'مدن',          artS:'la',  artP:'le',  rule:'نهاية مضغوطة → لا تتغير'},
+  {it:'estate',      itP:'estati',        ar:'صيف',                 artS:"l'",  artP:'le',   rule:'-e → -i (مؤنث)'},
+  {it:'autobus',     itP:'autobus',       ar:'أتوبيس',              artS:"l'",  artP:'gli',   rule:'invariabile / gli'},
+  {it:'cinema',      itP:'cinema',        ar:'سينما',               artS:"il",  artP:'i',   rule:'invariabile'},
+  {it:'giornale',    itP:'giornali',      ar:'جريدة',               artS:"il",  artP:'i',   rule:'-e → -i (مذكر)'},
+  {it:'pizza',       itP:'pizze',         ar:'بيتزا',               artS:"la",  artP:'le',   rule:'-a → -e (مؤنث)'},
+  {it:'cucina',      itP:'cucine',        ar:'مطبخ',                artS:"la",  artP:'le',   rule:'-a → -e (مؤنث)'},
+  {it:'camera',      itP:'camere',        ar:'غرفة',                artS:"la",  artP:'le',   rule:'-a → -e (مؤنث)'},
+  {it:'invito',      itP:'inviti',        ar:'دعوة',                artS:"l'",  artP:'gli',   rule:'-o → -i (مذكر) / gli'},
+  {it:'italiano',    itP:'italiani',      ar:'إيطالي',              artS:"l'",  artP:'gli',   rule:'-o → -i (مذكر) / gli'},
+  {it:'ufficio',     itP:'uffici',        ar:'مكتب',                artS:"l'",  artP:'gli',   rule:'-o → -i (مذكر) / gli'},
+  {it:'succo',       itP:'succhi',        ar:'عصير',                artS:"il",  artP:'i',   rule:'-co → -chi'},
+  {it:'tempo',       itP:'tempi',         ar:'وقت / طقس',           artS:"il",  artP:'i',   rule:'-o → -i (مذكر)'},
+  {it:'quaderno',    itP:'quaderni',      ar:'كراسة',               artS:"il",  artP:'i',   rule:'-o → -i (مذكر)'},
+  {it:'cellulare',   itP:'cellulari',     ar:'موبايل',              artS:"il",  artP:'i',   rule:'-e → -i (مذكر)'},
+  {it:'palestra',    itP:'palestre',      ar:'صالة رياضية',         artS:"la",  artP:'le',   rule:'-a → -e (مؤنث)'},
+  {it:'bicicletta',  itP:'biciclette',    ar:'دراجة هوائية',        artS:"la",  artP:'le',   rule:'-a → -e (مؤنث)'},
+  {it:'storia',      itP:'storie',        ar:'تاريخ / قصة',         artS:"la",  artP:'le',   rule:'-ia → -ie (مؤنث)'},
+  {it:'colazione',   itP:'colazioni',     ar:'إفطار',                artS:"la",  artP:'le',   rule:'-e → -i (مؤنث)'},
+  {it:'sport',       itP:'sport',         ar:'رياضة',               artS:"lo",  artP:'gli',   rule:'invariabile / gli'},
+  {it:'stadio',      itP:'stadi',         ar:'ملعب',                artS:"lo",  artP:'gli',   rule:'-io → -i / gli'},
+  {it:'schermo',     itP:'schermi',       ar:'شاشة',                artS:"lo",  artP:'gli',   rule:'-o → -i / gli'},
+  {it:'spazio',      itP:'spazi',         ar:'فضاء / مساحة',        artS:"lo",  artP:'gli',   rule:'-io → -i / gli'},
+  {it:'zio',         itP:'zii',           ar:'عم / خال',            artS:"lo",  artP:'gli',   rule:'-io → -ii / gli'},
+  {it:'zero',        itP:'zeri',          ar:'صفر',                 artS:"lo",  artP:'gli',   rule:'-o → -i / gli'},
+  {it:'zucchero',    itP:'zuccheri',      ar:'سكر',                 artS:"lo",  artP:'gli',   rule:'-o → -i / gli'},
+  {it:'zoo',         itP:'zoo',           ar:'حديقة حيوان',         artS:"lo",  artP:'gli',   rule:'invariabile / gli'},
+  {it:'appartamento',itP:'appartamenti',  ar:'شقة',                 artS:"l'",  artP:'gli',   rule:'-o → -i / gli'},
+  {it:'ora',         itP:'ore',           ar:'ساعة / الآن',         artS:"l'",  artP:'le',   rule:'-a → -e (مؤنث)'},
+  {it:'inverno',     itP:'inverni',       ar:'شتاء',                artS:"l'",  artP:'gli',   rule:'-o → -i / gli'},
+  {it:'isola',       itP:'isole',         ar:'جزيرة',               artS:"l'",  artP:'le',   rule:'-a → -e (مؤنث)'},
+  {it:'esame',       itP:'esami',         ar:'امتحان',              artS:"l'",  artP:'gli',   rule:'-e → -i / gli'},
+  {it:'telefono',    itP:'telefoni',      ar:'هاتف',              artS:"il",  artP:'i',   rule:'-o → -i (مذكر)'},
+  {it:'tè',          itP:'tè',            ar:'شاي',                 artS:"il",  artP:'i',   rule:'invariabile'},
+  {it:'film',        itP:'film',          ar:'فيلم',                artS:"il",  artP:'i',   rule:'invariabile'},
+  {it:'messaggio',   itP:'messaggi',      ar:'رسالة',               artS:"il",  artP:'i',   rule:'-gio → -gi'},
+  {it:'regalo',      itP:'regali',        ar:'هدية',                artS:"il",  artP:'i',   rule:'-o → -i (مذكر)'},
+  {it:'verità',      itP:'verità',        ar:'حقيقة',               artS:"la",  artP:'le',   rule:'invariabile (مؤنث)'},
+  {it:'spesa',       itP:'spese',         ar:'تسوق / مشتريات',      artS:"la",  artP:'le',   rule:'-a → -e (مؤنث)'},
+  {it:'voce',        itP:'voci',          ar:'صوت',                 artS:"la",  artP:'le',   rule:'-e → -i (مؤنث)'},
+  {it:'lingua',      itP:'lingue',        ar:'لغة / لسان',          artS:"la",  artP:'le',   rule:'-gua → -gue (مؤنث)'},
+  {it:'famiglia',    itP:'famiglie',      ar:'عائلة',               artS:"la",  artP:'le',   rule:'-ia → -ie (مؤنث)'}
+];
+
+/* Grammar Dictionaries for References Page */
+const GENDER_RULES=[
+  {rule:'نهاية -O غالباً مذكر / نهاية -A غالباً مؤنث',   examples:['libro — كتاب','porta — باب'], exceptions:['mano (مؤنث)','problema (مذكر)','dentista (مذكر)']},
+  {rule:'الأسماء المنتهية بـ -E تحفظ بالاعتياد والبحث', examples:['padre (أب/مذكر)','madre (أم/مؤنث)'], exceptions:[]}
+];
+const ARTICLE_RULES=[
+  {article:'il', rule:'مذكر يبدأ بساكن', examples:['il libro','il treno']},
+  {article:'lo', rule:'مذكر يبدأ بـ S+ساكن أو Z', examples:['lo studente','lo zaino']},
+  {article:"l'", rule:'مذكر أو مؤنث بمتحرك', examples:["l'amico","l'estate"]},
+  {article:'la', rule:'مؤنث يبدأ بساكن', examples:['la porta','la scuola']},
+  {article:'i',  rule:'جمع il', examples:['i libri']},
+  {article:'gli',rule:'جمع lo / l\' المذكر', examples:['gli studenti','gli amici']},
+  {article:'le', rule:'جمع مؤنث دائم (la / l\')', examples:['le porte','le amiche']}
+];
+const PREP_RULES=[
+  {it:'a',  ar:'في/إلى',      note:'للمدن (a Roma) والأنشطة والأماكن العادية كـ a scuola.'},
+  {it:'in', ar:'في/بواسطة',   note:'للدول (in Italia)، غرف البيت، المواصلات والشهور/الفصول.'},
+  {it:'di', ar:'من/عن/لـ',    note:'للملكية والموضوع أو طبيعة ووقت (di mattina / di storia).'},
+  {it:'da', ar:'من عند/مكان', note:'من وإلى الشخص (dal dottore) والأصل المغادر (dal lavoro).'},
+  {it:'su', ar:'على',         note:'تأتي غالبا مُدمجة su+il=sul للأسطح المادية (sul tavolo).'},
+  {it:'per',ar:'لـ/عبر',      note:'لاتتدمج؛ تعبر عن وجهة وسبب ووقت مقضِي.'},
+  {it:'con',ar:'مع',          note:'للمرافقة والحال المادي والمعنوي.'},
+  {it:'tra',ar:'خلال/بين',    note:'مسافة متبقية للفعل أو إيحاء بالمجتمع (fra و tra نفس الشيء).'}
+];
+

@@ -1,0 +1,2198 @@
+function getLearningUnitsByStage(stage) {
+  return LEARNING_UNITS.filter(u => u.stage === stage);
+}
+
+function buildLayeredQueue(unit) {
+  // بناء طابور الأسئلة المتدرج لوحدة تعليمية واحدة
+  let queue = [];
+  
+  // الطبقة 1: الكلمة
+  queue.push({type: 'layer1_show_word', unit: unit});
+  queue.push({type: 'layer1_mcq_meaning', unit: unit});
+  queue.push({type: 'layer1_mcq_gender', unit: unit});
+  
+  // الطبقة 2: حرف الجر
+  queue.push({type: 'layer2_show_prep', unit: unit});
+  queue.push({type: 'layer2_mcq_prep_meaning', unit: unit});
+  queue.push({type: 'layer2_mcq_why_prep', unit: unit});
+  
+  // الطبقة 3: منطق الدمج
+  queue.push({type: 'layer3_show_fusion', unit: unit});
+  queue.push({type: 'layer3_mcq_fusion_result', unit: unit});
+  queue.push({type: 'layer3_explain_why', unit: unit});
+  
+  // الطبقة 4: التطبيق
+  queue.push({type: 'layer4_fill_blank_hint', unit: unit});
+  queue.push({type: 'layer4_write_expression', unit: unit});
+  queue.push({type: 'layer4_translate', unit: unit});
+  
+  return queue;
+}
+
+
+
+
+function buildSetQueue(id, stage) {
+  let queue = [];
+  if (id === 'A') {
+    if(stage===1) {
+      shuffle([...SET_A1_WORDS]).forEach(w => queue.push({type:'setA_id', word:w}));
+    } else if (stage===2) {
+      shuffle([...SET_A2_WORDS]).forEach(w => queue.push({type:'setA_art', word:w}));
+    } else {
+      shuffle([...SET_A3_WORDS]).forEach(w => queue.push({type:'setA_write', word:w}));
+    }
+  } else if (id === 'B') {
+    let ws = shuffle([...SET_B_WORDS]);
+    if(stage===1) {
+      ws.filter(w=>!w.isException).forEach(w=>queue.push({type:'setB_gender', word:w}));
+    } else if (stage===2) {
+      ws.filter(w=>w.isException || w.ending==='e').forEach(w=>queue.push({type:'setB_gender', word:w}));
+    } else {
+      ws.forEach(w=>queue.push({type:'setB_write', word:w})); // Write appropriate 'il' or 'la'
+    }
+  } else if (id === 'C') {
+    let ws = shuffle([...SET_C_WORDS]);
+    if(stage===1) {
+      ws.forEach(w=>queue.push({type:'setC_mcq', word:w, hints:true}));
+    } else if (stage===2) {
+      ws.forEach(w=>queue.push({type:'setC_write', word:w, hints:true}));
+    } else {
+      ws.forEach(w=>queue.push({type:'setC_write', word:w, hints:false}));
+    }
+  } else if (id === 'D') {
+    let ts = shuffle([...SET_D_TERMS]);
+    if(stage===1) {
+      // Show Italian term → pick Arabic meaning
+      ts.forEach(t => queue.push({type:'setD_mcq_toAr', term:t}));
+    } else if (stage===2) {
+      // Show Arabic meaning → pick Italian term
+      ts.forEach(t => queue.push({type:'setD_mcq_toIt', term:t}));
+    } else {
+      // Show Arabic meaning → write Italian term
+      ts.forEach(t => queue.push({type:'setD_write', term:t}));
+    }
+  } else if (id === 'E') {
+    let ws = shuffle([...SET_E_WORDS]);
+    if(stage===1) {
+      ws.forEach(w => queue.push({type:'setE_mcq_plural', word:w}));
+    } else if (stage===2) {
+      ws.forEach(w => queue.push({type:'setE_mcq_art', word:w}));
+    } else {
+      ws.forEach(w => queue.push({type:'setE_write', word:w}));
+    }
+  } else if (id === 'F') {
+    // Preposizioni Semplici — 8 حروف جر
+    // Stage 1: A/DI/DA/IN — see + mcq_ar + mcq_it + mcq_note + write
+    // Stage 2: SU/PER/CON/TRA — نفس الترتيب
+    // Stage 3: كل الـ 8 مخلوطة — noHint mcq + write
+    let fChunks = [...SET_F_CHUNKS];
+    if(stage===1) {
+      fChunks.slice(0,4).forEach(c => {
+        queue.push({type:'see',        chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'recall_prep',chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'mcq_ar',     chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'mcq_it',     chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'mcq_note',   chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'sort_prep',  chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'write',      chunk:c});
+      });
+    } else if(stage===2) {
+      fChunks.slice(4).forEach(c => {
+        queue.push({type:'see',      chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'mcq_ar',   chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'mcq_it',   chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'mcq_note', chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'write',    chunk:c});
+      });
+    } else {
+      /* Stage 3: كل الـ 8 مخلوطة — أسئلة متنوعة أكثر */
+      shuffle(fChunks).forEach(c => {
+        queue.push({type:'recall_prep', chunk:c, pool:SET_F_CHUNKS, noHint:true});
+        queue.push({type:'sort_prep',   chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'mcq_ar',      chunk:c, pool:SET_F_CHUNKS, noHint:true});
+        queue.push({type:'mcq_note',    chunk:c, pool:SET_F_CHUNKS});
+        queue.push({type:'write',       chunk:c});
+      });
+    }
+  } else if (id === 'G') {
+    // Preposizioni Articolate — 35 صيغة — 5 stages
+    // IL: AL DAL NEL SUL DEL
+    const G_IL  = SET_G_CHUNKS.filter(x=>['AL','DAL','NEL','SUL','DEL'].includes(x.it));
+    // LA: ALLA DALLA NELLA SULLA DELLA
+    const G_LA  = SET_G_CHUNKS.filter(x=>['ALLA','DALLA','NELLA','SULLA','DELLA'].includes(x.it));
+    // L': ALL' DALL' NELL' SULL' DELL'
+    const G_LP  = SET_G_CHUNKS.filter(x=>["ALL'","DALL'","NELL'","SULL'","DELL'"].includes(x.it));
+    // LO: ALLO DALLO NELLO SULLO DELLO
+    const G_LO  = SET_G_CHUNKS.filter(x=>['ALLO','DALLO','NELLO','SULLO','DELLO'].includes(x.it));
+    // الجمع: AI AGLI ALLE DAI DAGLI DALLE NEI NEGLI NELLE SUI SUGLI SULLE DEI DEGLI DELLE
+    const G_PLU = SET_G_CHUNKS.filter(x=>['AI','AGLI','ALLE','DAI','DAGLI','DALLE','NEI','NEGLI','NELLE','SUI','SUGLI','SULLE','DEI','DEGLI','DELLE'].includes(x.it));
+
+    const ctxFor = (st) => shuffle(CONTEXT_SENTENCES.filter(s=>s.stage===st));
+    const getPool = (group) => [...group, ...shuffle(SET_G_CHUNKS.filter(x=>!group.includes(x))).slice(0,4)];
+
+    if(stage===1) {
+      // IL: see + mcq_ar + decompose + combine + mcq_it + fill_blank
+      shuffle(G_IL).forEach(ch => {
+        queue.push({type:'see',       chunk:ch, pool:getPool(G_IL)});
+        queue.push({type:'mcq_ar',    chunk:ch, pool:getPool(G_IL)});
+        queue.push({type:'setG_decompose', chunk:ch});
+        queue.push({type:'setG_combine',   chunk:ch});
+        queue.push({type:'mcq_it',    chunk:ch, pool:getPool(G_IL)});
+      });
+      ctxFor(1).forEach(s => queue.push({type:'setG_fill_blank', sentence:s}));
+
+    } else if(stage===2) {
+      // LA + L': see + mcq_ar + decompose + context_pick + combine
+      shuffle([...G_LA,...G_LP]).forEach(ch => {
+        queue.push({type:'see',            chunk:ch, pool:getPool([...G_LA,...G_LP])});
+        queue.push({type:'mcq_ar',         chunk:ch, pool:getPool([...G_LA,...G_LP])});
+        queue.push({type:'setG_decompose', chunk:ch});
+        queue.push({type:'setG_combine',   chunk:ch});
+      });
+      ctxFor(2).forEach(s => queue.push({type:'setG_context_pick', sentence:s, pool:[...G_LA,...G_LP]}));
+
+    } else if(stage===3) {
+      // LO: see + mcq_it + decompose + combine + context_pick
+      shuffle(G_LO).forEach(ch => {
+        queue.push({type:'see',            chunk:ch, pool:getPool(G_LO)});
+        queue.push({type:'mcq_it',         chunk:ch, pool:getPool(G_LO)});
+        queue.push({type:'setG_decompose', chunk:ch});
+        queue.push({type:'setG_combine',   chunk:ch});
+      });
+      ctxFor(3).forEach(s => queue.push({type:'setG_fill_blank', sentence:s}));
+
+    } else if(stage===4) {
+      // الجمع: mcq_ar + decompose + context_pick + fill_blank
+      shuffle(G_PLU).forEach(ch => {
+        queue.push({type:'mcq_ar',         chunk:ch, pool:getPool(G_PLU)});
+        queue.push({type:'setG_decompose', chunk:ch});
+        queue.push({type:'mcq_it',         chunk:ch, pool:getPool(G_PLU)});
+      });
+      ctxFor(4).forEach(s => queue.push({type:'setG_context_pick', sentence:s, pool:G_PLU}));
+      ctxFor(4).forEach(s => queue.push({type:'setG_fill_blank', sentence:s}));
+
+    } else {
+      // Stage 5: مراجعة مختلطة — context_pick + fill_blank + sentence_translate + mistakes_quiz
+      shuffle([...CONTEXT_SENTENCES]).forEach(s => {
+        queue.push({type:'setG_context_pick', sentence:s, pool:SET_G_CHUNKS});
+      });
+      CONTEXT_SENTENCES.filter(s=>s.stage<=2).forEach(s => {
+        queue.push({type:'setG_sentence_translate', sentence:s});
+      });
+      CONTEXT_SENTENCES.filter(s=>s.stage>=3).forEach(s => {
+        queue.push({type:'setG_fill_blank', sentence:s});
+      });
+      shuffle(COMMON_MISTAKES).slice(0,5).forEach(m => {
+        queue.push({type:'setG_mistakes_quiz', mistake:m});
+      });
+    }
+  } else if (id === 'I') {
+    // Set I — أدوات الاستفهام في جمل سياق
+    // Stage 1: quando/dove/come/cosa (الأكثر شيوعاً)
+    // Stage 2: chi/perché/quanto/quale
+    // Stage 3: كل الأدوات مخلوطة
+    let stage1Words = ['quando','dove','come','cosa'];
+    let stage2Words = ['chi','perché','quanto','quale'];
+    let s1 = INTERROGATIVE_SENTENCES.filter(s => stage1Words.includes(s.word));
+    let s2 = INTERROGATIVE_SENTENCES.filter(s => stage2Words.includes(s.word));
+    if(stage===1) {
+      // عرض كل chunk ثم MCQ ثم ملء فراغ
+      SET_I_CHUNKS.slice(0,4).forEach(c => {
+        queue.push({type:'setI_see',   chunk:c, pool:SET_I_CHUNKS});
+        queue.push({type:'setI_mcq',   chunk:c, pool:SET_I_CHUNKS});
+      });
+      shuffle(s1).forEach(s => queue.push({type:'setI_fill', sentence:s, pool:SET_I_CHUNKS}));
+    } else if(stage===2) {
+      SET_I_CHUNKS.slice(4).forEach(c => {
+        queue.push({type:'setI_see',   chunk:c, pool:SET_I_CHUNKS});
+        queue.push({type:'setI_mcq',   chunk:c, pool:SET_I_CHUNKS});
+      });
+      shuffle(s2).forEach(s => queue.push({type:'setI_fill', sentence:s, pool:SET_I_CHUNKS}));
+    } else {
+      // Stage 3: كل الأدوات + أخطاء شائعة
+      shuffle(SET_I_CHUNKS).forEach(c => {
+        queue.push({type:'setI_mcq',   chunk:c, pool:SET_I_CHUNKS});
+        queue.push({type:'setI_write', chunk:c});
+      });
+      shuffle(INTERROGATIVE_SENTENCES).forEach(s => queue.push({type:'setI_fill', sentence:s, pool:SET_I_CHUNKS}));
+      shuffle(INTERROGATIVE_MISTAKES).slice(0,4).forEach(m => queue.push({type:'setI_mistake', mistake:m}));
+    }
+  }
+  return queue;  // ← الإصلاح: إرجاع الطابور
+}                // ← الإصلاح: إغلاق دالة buildSetQueue
+
+/* ═══════════════════════════ SCREENS RENDERER ═══════════════════════════ */
+function showScreen(name) {
+  ['home','session','info','review','end'].forEach(n => {
+    let s = $('screen-'+n);
+    if(s) s.classList.remove('active');
+  });
+  $('screen-'+name).classList.add('active');
+  $('btn-home').style.display = (name === 'home' ? 'none' : 'flex');
+  $('footer').style.display = (name === 'session' ? 'flex' : 'none');
+}
+
+function goHome() {
+  if(session && !session.setId && session.chunkId) {
+    appState.ips = { ...session };
+    save();
+  } else {
+    appState.ips = null;
+    save();
+  }
+  session = null;
+  renderHome();
+}
+
+function startChunkDirect(chunkIt) {
+  const c = CHUNKS.find(x => x.it === chunkIt);
+  if(!c) return;
+  sessionStats = {c:0, w:0};
+  appState.ips = null;
+  const q = buildChunkQueue(c);
+  session = { queue:q, idx:0, chunkId:c.it, isReview:false };
+  save();
+  renderQuestion();
+  showScreen('session');
+}
+
+/* ═════ 1. HOME SCREEN ═════ */
+function renderHome() {
+  $('progress-bar').style.width = '0%';
+  $('btn-tts').textContent = appState.tts ? '🔊' : '🔇';
+  showScreen('home');
+
+  let due = CHUNKS.filter(c => { let p=getCP(c.it); return p.m>0 && p.nextRv && p.nextRv<=Date.now(); }).length;
+  let done = CHUNKS.filter(c => getCP(c.it).m>0).length;
+  let firstNew = CHUNKS.find(c => getCP(c.it).m === 0) || CHUNKS[CHUNKS.length-1];
+  let nCp = getCP(firstNew.it);
+  let pWidth = Math.round(done/CHUNKS.length*100);
+
+  let memHtml = '';
+  if (nCp.m > 0) {
+    let lA = MASTERY[Math.min(4, nCp.m-1)];
+    let dt = new Date(nCp.nextRv).toLocaleDateString('ar-EG', {month:'short', day:'numeric'});
+    memHtml = `
+      <div class="mem-block">
+        <div class="mem-label"><span>الذاكرة للمقطع الحالي</span><span style="color:var(--blue);">${nCp.mem}%</span></div>
+        <div class="mem-bar-wrap"><div class="mem-bar-fill" style="width:${nCp.mem}%"></div></div>
+        <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:11px; color:var(--muted);">
+          <span>المرتبة: ${lA.name} 💎</span><span>مراجعة مستحقة: ${nCp.nextRv<=Date.now()?'الآن!':dt}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  // Chips
+  const MASTERY_LABELS = ['● رأيته','● مألوف','● مرتاح','● قوي','● مختوم'];
+  let dots = CHUNKS.map((c) => {
+    let v = getCP(c.it).m;
+    let lv = Math.min(5, v);
+    let act = (c.it === firstNew.it) ? ' cdot-cur' : '';
+    let safeIt = c.it.replace(/'/g, "\\'");
+    let label = v === 0 ? c.it : c.it;
+    let title = v === 0 ? 'جديد' : (MASTERY_LABELS[Math.min(4, v-1)] || '');
+    return `<div class="cdot cdot-${lv}${act}" onclick="startChunkDirect('${safeIt}')" title="${title}">${label}</div>`;
+  }).join('');
+
+  // Legend
+  const legendHtml = `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;font-size:10px;direction:rtl;">
+      <span style="background:var(--lv0);color:#555;padding:2px 8px;border-radius:6px;font-weight:700;">جديد</span>
+      <span style="background:var(--lv1);color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">● رأيته</span>
+      <span style="background:var(--lv2);color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">● مألوف</span>
+      <span style="background:var(--lv3);color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">● مرتاح</span>
+      <span style="background:var(--lv4);color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">● قوي</span>
+      <span style="background:var(--purple);color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">● مختوم</span>
+    </div>
+  `;
+
+  $('screen-home').innerHTML = `
+    <div class="splash-wrap">
+      <div class="splash-flag">🇮🇹</div>
+      <div class="splash-title">تعلم الإيطالية</div>
+      <div style="font-size:12px; color:var(--muted); font-weight:700;">حفظت ${done} من ${CHUNKS.length}</div>
+      <div style="height:6px; background:var(--border); border-radius:4px; margin:8px 10vw 0; overflow:hidden;"><div style="height:100%; width:${pWidth}%; background:var(--green);"></div></div>
+    </div>
+    
+    <div class="chunk-hero">
+      <div class="ch-it" dir="ltr" onclick="playTTS('${firstNew.it.replace(/'/g,"\\'")}')" style="cursor:pointer">${firstNew.it} <span style="font-size:14px">🔊</span></div>
+      <div class="ch-ar">${firstNew.ar}</div>
+      ${firstNew.note ? `<div class="ch-note">${firstNew.note}</div>` : ''}
+    </div>
+
+    ${memHtml}
+
+    <button class="primary-btn" onclick="startEngine(false)">
+      ${appState.ips ? '🔄 إكمال الجلسة المفتوحة' : '▶ بدء التعلم والممارسة'}
+    </button>
+    ${due > 0 ? `<button class="secondary-btn" style="color:var(--red); background:var(--red-lt);" onclick="startEngine(true)">🔔 مراجعة الـ ${due} مقاطع المتراكمة</button>` : ''}
+    
+    <button class="ghost-btn" onclick="renderInfo()">📖 الجداول وتمارين القواعد الذكية</button>
+
+    <div class="section-label">خريطة التقدم — اضغط أي كلمة لتدريبها (${done}/${CHUNKS.length})</div>
+    ${legendHtml}
+    <div class="chunk-map">${dots}</div>
+  `;
+}
+
+/* ═════ 2. THE ENGINE & EXERCISES ═════ */
+function startEngine(isRv) {
+  sessionStats = {c:0, w:0};
+  
+  if (appState.ips && !isRv) {
+    session = {...appState.ips};
+  } else if (isRv) {
+    let now = Date.now();
+    let dQs = CHUNKS.filter(c => getCP(c.it).m>0 && getCP(c.it).nextRv<=now);
+    if(dQs.length===0) return;
+    let q = [];
+    shuffle(dQs).slice(0,5).forEach(c => {
+      q.push({type:'mcq_ar', chunk:c, rv:true});
+      q.push({type:'write', chunk:c, rv:true});
+    });
+    session = { queue: shuffle(q), idx:0, chunkId:null, isReview:true };
+  } else {
+    let nx = CHUNKS.find(c => getCP(c.it).m === 0) || CHUNKS[0];
+    let q = buildChunkQueue(nx);
+    session = { queue:q, idx:0, chunkId:nx.it, isReview:false };
+  }
+  
+  appState.ips = null; save();
+  renderQuestion();
+}
+
+function startSetEnv(id, stage) {
+  sessionStats = {c:0, w:0};
+
+  // Show a quick rule intro before the questions
+  const A_INTROS = {
+    1: {
+      title: 'Set A — المرحلة 1: تحديد الحرف',
+      icon: '🔤',
+      rule: `الحروف المتحركة الإيطالية هي: <span dir="ltr" style="font-size:22px; font-weight:900; color:var(--blue); font-family:'Courier New'; letter-spacing:3px;">A · E · I · O · U</span>`,
+      why: 'عندما تبدأ الكلمة بحرف متحرك، نكتب <b dir="ltr">l\'</b> بدلاً من il / la / lo لتجنّب التقاء صوتين.',
+      examples: ["l'amico ← amico", "l'estate ← estate", "il libro ← libro", "la porta ← porta"]
+    },
+    2: {
+      title: 'Set A — المرحلة 2: اختيار الأداة',
+      icon: '📝',
+      rule: 'اختر أداة التعريف الصحيحة من الأربعة:',
+      why: 'الآن نطبّق القاعدة — كل كلمة تحتاج الأداة المناسبة لجنسها وحرفها الأول.',
+      table: `<table style="width:100%; border-collapse:collapse; direction:ltr; font-size:14px; margin-top:10px; text-align:center;">
+        <tr style="background:var(--blue);color:#fff;"><th style="padding:8px;">الأداة</th><th>متى؟</th><th>مثال</th></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:7px; font-size:18px; font-weight:900; color:var(--blue);">il</td><td style="text-align:right; padding:7px;">مذكر + ساكن عادي</td><td>il libro</td></tr>
+        <tr><td style="padding:7px; font-size:18px; font-weight:900; color:var(--blue);">lo</td><td style="text-align:right; padding:7px;">مذكر + Z أو S+ساكن</td><td>lo zaino</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:7px; font-size:18px; font-weight:900; color:var(--blue);">la</td><td style="text-align:right; padding:7px;">مؤنث + ساكن</td><td>la porta</td></tr>
+        <tr><td style="padding:7px; font-size:18px; font-weight:900; color:var(--blue);">l'</td><td style="text-align:right; padding:7px;">أي جنس + متحرك</td><td>l'amico, l'estate</td></tr>
+      </table>`
+    },
+    3: {
+      title: 'Set A — المرحلة 3: الكتابة من الذاكرة',
+      icon: '🧠',
+      rule: 'هذه المرحلة بدون خيارات — اكتب الأداة من الذاكرة.',
+      why: 'فكّر في ثلاثة أسئلة: هل تبدأ بمتحرك؟ → <b dir="ltr">l\'</b> | هل هي مؤنثة؟ → <b dir="ltr">la</b> | هل تبدأ بـ Z أو S+ساكن؟ → <b dir="ltr">lo</b> | وإلا → <b dir="ltr">il</b>',
+      examples: ["l'università", "l'amico", "l'estate", "l'isola"]
+    }
+  };
+
+  const intros = {
+    A: A_INTROS[stage] || A_INTROS[1],
+    B: {
+      title: 'Set B — مذكر أم مؤنث؟',
+      icon: '⚥',
+      rule: 'القاعدة الأساسية للنهايات:',
+      why: '',
+      table: `<table style="width:100%; border-collapse:collapse; direction:ltr; font-size:14px; margin-top:10px; text-align:center;">
+        <tr style="background:var(--blue);color:#fff;"><th style="padding:8px;">النهاية</th><th>الجنس</th><th>مثال</th></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:7px; font-weight:900;">-O</td><td>مذكر 🚹</td><td>libro</td></tr>
+        <tr><td style="padding:7px; font-weight:900;">-A</td><td>مؤنث 🚺</td><td>porta</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:7px; font-weight:900;">-E</td><td>يُحفظ 📝</td><td>padre / madre</td></tr>
+        <tr style="background:#fff3e0;"><td style="padding:7px; font-weight:900; color:var(--orange);">استثناء</td><td>عكس القاعدة</td><td>mano, radio, problema</td></tr>
+      </table>`
+    },
+    D: {
+      title: 'Set D — أسماء المصطلحات',
+      icon: '🏷️',
+      rule: 'احفظ الأسماء الإيطالية لأقسام القواعد الأربعة:',
+      why: 'معرفة المصطلحات بتخليك تفهم أي كتاب أو مرجع إيطالي بسهولة',
+      examples: ['Il Genere', 'Articolo Determinativo', 'Preposizioni Semplici', 'Preposizioni Articolate']
+    },
+    F: {
+      title: 'Set F — حروف الجر البسيطة',
+      icon: '🔤',
+      rule: `الثمانية الأساسية: <span dir="ltr" style="font-size:18px;font-weight:900;color:var(--blue);font-family:'Courier New';letter-spacing:2px;">A · DI · DA · IN · SU · PER · CON · TRA</span>`,
+      why: 'يتدمج منهم فقط خمسة: A وDI وDA وIN وSU — أما PER وCON فلا يتدمجان أبداً',
+      table: `<table style="width:100%;border-collapse:collapse;direction:ltr;font-size:13px;margin-top:10px;text-align:center;">
+        <tr style="background:var(--blue);color:#fff;"><th style="padding:7px;">Prep</th><th>المعنى</th><th>مثال</th></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px;font-weight:900;font-size:17px;">A</td><td>في / إلى</td><td>a Roma, a scuola</td></tr>
+        <tr><td style="padding:6px;font-weight:900;font-size:17px;">DI</td><td>من / عن / لـ</td><td>di storia, di fame</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px;font-weight:900;font-size:17px;">DA</td><td>من / منذ / عند</td><td>dal dottore, da tre anni</td></tr>
+        <tr><td style="padding:6px;font-weight:900;font-size:17px;">IN</td><td>في / بـ</td><td>in Italia, in treno</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px;font-weight:900;font-size:17px;">SU</td><td>على / حول</td><td>sul tavolo, sul web</td></tr>
+        <tr><td style="padding:6px;font-weight:900;font-size:17px;">PER</td><td>لـ / من أجل / لمدة</td><td>per lavoro, per sempre</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px;font-weight:900;font-size:17px;">CON</td><td>مع / بواسطة</td><td>con gli amici</td></tr>
+        <tr><td style="padding:6px;font-weight:900;font-size:17px;">TRA/FRA</td><td>بين / خلال</td><td>tra due ore, fra poco</td></tr>
+      </table>`
+    },
+    G: {
+      title: 'Set G — حروف الجر المدمجة',
+      icon: '🔗',
+      rule: 'الدمج يحدث تلقائياً عندما يلي حرف الجر أداة تعريف:',
+      why: '<b>a+il=AL · da+il=DAL · in+il=NEL · su+il=SUL · di+il=DEL</b><br><span style="font-size:12px;color:var(--muted);">PER وCON استثناء — لا يتدمجان أبداً</span>',
+      table: `<table class="ref-table" style="font-size:12px;">
+        <tr><th>IL</th><th>LO</th><th>LA</th><th>L'</th><th>I</th><th>GLI</th><th>LE</th><th style="background:var(--blue);">Prep</th></tr>
+        <tr><td>AL</td><td>ALLO</td><td>ALLA</td><td>ALL'</td><td>AI</td><td>AGLI</td><td>ALLE</td><td class="art">A</td></tr>
+        <tr><td>DAL</td><td>DALLO</td><td>DALLA</td><td>DALL'</td><td>DAI</td><td>DAGLI</td><td>DALLE</td><td class="art">DA</td></tr>
+        <tr><td>NEL</td><td>NELLO</td><td>NELLA</td><td>NELL'</td><td>NEI</td><td>NEGLI</td><td>NELLE</td><td class="art">IN</td></tr>
+        <tr><td>SUL</td><td>SULLO</td><td>SULLA</td><td>SULL'</td><td>SUI</td><td>SUGLI</td><td>SULLE</td><td class="art">SU</td></tr>
+        <tr><td>DEL</td><td>DELLO</td><td>DELLA</td><td>DELL'</td><td>DEI</td><td>DEGLI</td><td>DELLE</td><td class="art">DI</td></tr>
+      </table>`
+    },
+    E: {
+      title: 'Set E — الجمع: مذكر ومؤنث',
+      icon: '📚',
+      rule: 'قواعد الجمع الإيطالي:',
+      why: 'كل اسم له جمع يتغير حسب نهايته — وأداة التعريف تتغير هي الأخرى.',
+      table: `<table style="width:100%; border-collapse:collapse; direction:ltr; font-size:13px; margin-top:10px; text-align:center;">
+        <tr style="background:var(--blue);color:#fff;"><th style="padding:7px;">المفرد</th><th>الجمع</th><th>أداة المفرد</th><th>أداة الجمع</th></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px; font-weight:900;">-o (م)</td><td style="font-weight:900;">-i</td><td>il / lo</td><td>i / gli</td></tr>
+        <tr><td style="padding:6px; font-weight:900;">-a (م)</td><td style="font-weight:900;">-e</td><td>la</td><td>le</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px; font-weight:900;">-e</td><td style="font-weight:900;">-i</td><td>il/la/lo</td><td>i/gli/le</td></tr>
+        <tr style="background:#fff3e0;"><td style="padding:6px; font-weight:900; color:var(--orange);">مضغوط</td><td style="color:var(--orange); font-weight:900;">ثابت</td><td>—</td><td>—</td></tr>
+      </table>`
+    },
+    C: {
+      title: 'Set C — أدوات التعريف الأربعة',
+      icon: '📋',
+      rule: 'الأدوات المفردة المذكرة والمؤنثة:',
+      why: '',
+      table: `<table style="width:100%; border-collapse:collapse; direction:ltr; font-size:14px; margin-top:10px; text-align:center;">
+        <tr style="background:var(--blue);color:#fff;"><th style="padding:8px;">الأداة</th><th>متى نستخدمها؟</th><th>مثال</th></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:7px; font-size:20px; font-weight:900; color:var(--blue);">il</td><td style="text-align:right; padding:7px;">مذكر + ساكن عادي</td><td>il libro</td></tr>
+        <tr><td style="padding:7px; font-size:20px; font-weight:900; color:var(--blue);">lo</td><td style="text-align:right; padding:7px;">مذكر + Z أو S+ساكن</td><td>lo zaino, lo studente</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:7px; font-size:20px; font-weight:900; color:var(--blue);">la</td><td style="text-align:right; padding:7px;">مؤنث + ساكن</td><td>la porta</td></tr>
+        <tr><td style="padding:7px; font-size:20px; font-weight:900; color:var(--blue);">l'</td><td style="text-align:right; padding:7px;">أي جنس + متحرك</td><td>l'amico, l'estate</td></tr>
+      </table>`
+    },
+    I: {
+      title: 'Set I — أدوات الاستفهام',
+      icon: '❓',
+      rule: `الأدوات الثمانية: <span dir="ltr" style="font-size:16px;font-weight:900;color:var(--blue);font-family:'Courier New';letter-spacing:2px;">quando · dove · come · cosa · chi · quanto · perché · quale</span>`,
+      why: 'كل أداة لها وظيفة مختلفة — quando للزمن، dove للمكان، come للحال، cosa للشيء، chi للشخص، quanto للكمية، perché للسبب، quale للاختيار',
+      table: `<table style="width:100%;border-collapse:collapse;direction:ltr;font-size:13px;margin-top:10px;text-align:center;">
+        <tr style="background:var(--blue);color:#fff;"><th style="padding:7px;">الكلمة</th><th>المعنى</th><th>مثال</th></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px;font-weight:900;font-size:16px;">quando</td><td>متى</td><td>Quando arrivi?</td></tr>
+        <tr><td style="padding:6px;font-weight:900;font-size:16px;">dove</td><td>أين</td><td>Dove abiti?</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px;font-weight:900;font-size:16px;">come</td><td>كيف</td><td>Come stai?</td></tr>
+        <tr><td style="padding:6px;font-weight:900;font-size:16px;">cosa</td><td>ماذا</td><td>Cosa fai?</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px;font-weight:900;font-size:16px;">chi</td><td>من</td><td>Chi sei?</td></tr>
+        <tr><td style="padding:6px;font-weight:900;font-size:16px;">quanto/a/i/e</td><td>كم</td><td>Quanti anni hai?</td></tr>
+        <tr style="background:#f0f7ff;"><td style="padding:6px;font-weight:900;font-size:16px;">perché</td><td>لماذا / لأن</td><td>Perché studi?</td></tr>
+        <tr><td style="padding:6px;font-weight:900;font-size:16px;">quale/i</td><td>أيّ</td><td>Quale preferisci?</td></tr>
+      </table>`
+    }
+  };
+
+  let intro = intros[id];
+  if(intro) {
+    let exHtml = intro.examples ? `<div style="display:flex; flex-wrap:wrap; gap:6px; direction:ltr; margin-top:10px;">${intro.examples.map(e=>`<div class="info-ex-chip">${e}</div>`).join('')}</div>` : '';
+    $('screen-end').innerHTML = `
+      <div style="padding:20px 14px;">
+        <div style="text-align:center; font-size:36px; margin-bottom:6px;">${intro.icon}</div>
+        <h2 class="q-title">${intro.title}</h2>
+        <div class="hint-box" style="text-align:center; font-size:15px;">${intro.rule}</div>
+        ${intro.why ? `<p style="font-size:14px; color:var(--muted); font-weight:600; line-height:1.7; margin:12px 0;">${intro.why}</p>` : ''}
+        ${intro.table || ''}
+        ${exHtml}
+        <div style="margin-top:20px;">
+          <span class="stage-badge" style="background:var(--blue); color:#fff; font-size:13px; padding:6px 14px;">المرحلة ${stage} من 3</span>
+        </div>
+        <button class="primary-btn" style="margin-top:20px;" onclick="launchSet('${id}', ${stage})">▶ ابدأ التمرين</button>
+        <button class="ghost-btn" onclick="renderInfo()">↩ رجوع</button>
+      </div>`;
+    showScreen('end');
+  } else {
+    launchSet(id, stage);
+  }
+}
+
+function launchSet(id, stage) {
+  let qs = buildSetQueue(id, stage);
+  session = { queue: qs, idx:0, setId:id, setStage:stage };
+  renderQuestion();
+}
+
+
+// ══ getArticleB: يحسب الأداة الصح لكلمات Set B ══
+function getArticleB(w) {
+  // استثناءات محددة
+  if(w.it==='radio' || w.it==='mano')    return 'la';
+  if(w.it==='problema' || w.it==='dentista' || w.it==='cinema') return 'il';
+  // متحرك → l'
+  if(w.it.match(/^[aeiouàèéìòùAEIOUÀÈÉÌÒÙ]/)) return "l'";
+  // مذكر + Z → lo
+  if(w.gender==='m' && w.it.match(/^[zZ]/)) return 'lo';
+  // مذكر + S+ساكن → lo
+  if(w.gender==='m' && w.it.match(/^[sS][^aeiouàèéìòùAEIOUÀÈÉÌÒÙ]/)) return 'lo';
+  // مذكر + gn/ps/x → lo
+  if(w.gender==='m' && w.it.match(/^(gn|ps|x)/i)) return 'lo';
+  // مؤنث + ساكن → la
+  if(w.gender==='f') return 'la';
+  // مذكر + ساكن عادي → il
+  return 'il';
+}
+
+function renderQuestion() {
+  if(!session || session.idx >= session.queue.length) return finishEngine();
+  
+  let qItem = session.queue[session.idx];
+  waiting = false; pickedMcq = null; retryMode = false;
+  $('progress-bar').style.width = Math.round(session.idx / session.queue.length * 100) + '%';
+  $('main-btn').textContent = "تحقق ✓";
+  $('main-btn').disabled = false;
+  
+  let f = $('feedback-box'); f.style.display='none'; f.className='';
+  
+  let qc = $('question-container');
+  let topBadg = session.isReview ? `<span class="stage-badge" style="background:var(--gold);color:#000;">🔄 مراجعة استرجاعية</span>` : 
+               (qItem.rv ? `<span class="stage-badge">🔄 اختبار</span>` : (session.setId ? `<span class="stage-badge" style="background:var(--blue);">📝 تمرين Set ${session.setId} - جزء ${session.setStage}</span>`:`<span class="stage-badge" style="background:var(--purple);color:#fff;">استيعاب وتعلم</span>`));
+  let html = topBadg;
+  
+  showScreen('session');
+  currentItem = qItem;
+
+  // -- BASE TYPES --
+  if (qItem.type === 'see') {
+    let c = qItem.chunk;
+    let safeIt = c.it.replace(/'/g,"\\'");
+    let safeAr = c.ar.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    html += `
+      <h2 class="q-title">اقرأ واحفظ المعنى جيداً</h2>
+      <div class="word-card" style="font-size:38px; cursor:pointer;" onclick="playTTS('${safeIt}')">${c.it} 🔊</div>
+      ${c.img ? `<div style="text-align:center; font-size:13px; font-weight:700; color:var(--teal); background:#e0f2f1; border-radius:8px; padding:6px 12px; margin-bottom:12px; display:inline-block; width:100%;">🧠 ${c.img}</div>` : ''}
+      <div id="see-ar-wrap" style="text-align:center; margin-bottom:12px;">
+        <button onclick="
+          document.getElementById('see-ar-wrap').innerHTML =
+          '<div style=\\'text-align:center; font-size:22px; font-weight:800; color:var(--text); padding:8px 0;\\'>${safeAr}</div>';
+        " style="background:var(--blue-lt); color:var(--blue); border:2px dashed var(--blue); border-radius:10px; padding:10px 20px; font-size:14px; font-weight:800; cursor:pointer; font-family:Cairo,sans-serif; width:100%;">
+          اضغط لرؤية الترجمة 👁
+        </button>
+      </div>
+      <div class="hint-box" style="text-align:right;">${c.note}</div>
+      ${(()=>{
+        const sim={
+          'DI':{other:'DA',myLbl:'DI — من/عن/لـ',otherLbl:'DA — من/منذ/عند',myEx:'di Marco (ملكية)',otherEx:'da Roma (انطلاق)'},
+          'DA':{other:'DI',myLbl:'DA — من/منذ/عند',otherLbl:'DI — من/عن/لـ',myEx:'da Roma (انطلاق)',otherEx:'di Marco (ملكية)'},
+          'A' :{other:'IN',myLbl:'A — في/إلى (مدن وأماكن)',otherLbl:'IN — في/بـ (دول وغرف)',myEx:'a Roma / a casa',otherEx:'in Italia / in cucina'},
+          'IN':{other:'A', myLbl:'IN — في/بـ (دول وغرف)',otherLbl:'A — في/إلى (مدن وأماكن)',myEx:'in Italia / in treno',otherEx:'a Roma / a scuola'},
+        };
+        const s=sim[c.it.toUpperCase()];
+        if(!s) return '';
+        return `<div class="hint-box" style="margin-top:10px;border-color:var(--orange);background:#fff8f0;">
+          <div style="font-weight:900;font-size:13px;color:var(--orange);margin-bottom:6px;">⚠️ لا تخلط بين:</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+            <div style="background:var(--green-lt);border-radius:8px;padding:8px;text-align:center;">
+              <b style="color:var(--green);">${s.myLbl}</b><br>
+              <span style="color:var(--muted);font-style:italic;" dir="ltr">${s.myEx}</span>
+            </div>
+            <div style="background:#fff3e0;border-radius:8px;padding:8px;text-align:center;">
+              <b style="color:var(--orange);">${s.otherLbl}</b><br>
+              <span style="color:var(--muted);font-style:italic;" dir="ltr">${s.otherEx}</span>
+            </div>
+          </div>
+        </div>`;
+      })()}
+    `;
+    qc.innerHTML = html;
+    $('main-btn').textContent = "تابــع ←";
+    waiting = true;
+    playTTS(c.it);
+  }
+  
+  else if (qItem.type === 'mcq_ar') {
+    let pool = qItem.pool || CHUNKS;
+    /* dedup: اختار خيارات مختلفة في العرض العربي */
+    let candidates = shuffle(pool.filter(x => x.it !== qItem.chunk.it));
+    let chosen = []; let usedAr = new Set([qItem.chunk.ar]);
+    for(let c of candidates){
+      if(!usedAr.has(c.ar)){ usedAr.add(c.ar); chosen.push(c); }
+      if(chosen.length === 3) break;
+    }
+    if(chosen.length < 3) chosen.push(...candidates.filter(x=>!chosen.includes(x)).slice(0, 3-chosen.length));
+    let opts = shuffle([qItem.chunk, ...chosen]);
+    let hintHtml = (!qItem.noHint && qItem.chunk.note)
+      ? `<div class="hint-box">${qItem.chunk.note}</div>` : '';
+    html += `<h2 class="q-title">بماذا يترجم هذا المقطع؟</h2>
+             <div class="word-card" onclick="playTTS('${qItem.chunk.it.replace(/'/g,"\\'")}')"> ${qItem.chunk.it} 🔊</div>
+             ${hintHtml}
+             <div class="mcq-grid">${opts.map(o => `<div class="mcq-opt" data-ans="${o.it.replace(/'/g,"\\'")}" data-correct="${qItem.chunk.it.replace(/'/g,"\\'")}" onclick="chkOptSafe(this, false)"><span style="font-size:13px;line-height:1.4;">${o.ar}</span></div>`).join('')}</div>`;
+    qc.innerHTML = html;
+    currentItem.cx = qItem.chunk.it;
+  }
+
+  else if (qItem.type === 'mcq_note') {
+    let c = qItem.chunk;
+    let notePool2 = qItem.pool || CHUNKS; /* kept for reference */
+    let correctPrep = c.it.split(' ')[0];
+    let diffPrep = shuffle((qItem.pool||CHUNKS).filter(x => x.it !== c.it && x.note && x.it.split(' ')[0] !== correctPrep));
+    if(diffPrep.length < 3) diffPrep.push(...shuffle(CHUNKS.filter(x => x.it !== c.it && x.note && x.it.split(' ')[0] !== correctPrep && !diffPrep.includes(x))));
+    if(diffPrep.length < 3) diffPrep.push(...(qItem.pool||CHUNKS).filter(x => x.it !== c.it && x.note && !diffPrep.includes(x)));
+    let otherNotes = diffPrep.slice(0,3).map(x => x.note);
+    let opts = shuffle([c.note, ...otherNotes]);
+    let optsHtml = opts.map(o => {
+      let safeAns = o.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      let safeCorrect = c.note.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      return `<div class="mcq-opt" data-ans="${safeAns}" data-correct="${safeCorrect}" onclick="chkOptSafe(this, false)" style="font-size:13px; text-align:right; line-height:1.5;">${o}</div>`;
+    }).join('');
+    html += `<h2 class="q-title">ما القاعدة الصحيحة لهذا المقطع؟</h2>
+             <div class="word-card" onclick="playTTS('${c.it.replace(/'/g,"\\'")}')">${c.it} 🔊</div>
+             <div class="mcq-grid">${optsHtml}</div>`;
+    qc.innerHTML = html;
+    currentItem.cx = c.note;
+    playTTS(c.it);
+  }
+
+  else if (qItem.type === 'write_ar') {
+    let c = qItem.chunk;
+    html += `<h2 class="q-title">اكتب المعنى بالعربي 📝</h2>
+             <div class="word-card" onclick="playTTS('${c.it.replace(/'/g,"\\'")}')">${c.it} 🔊</div>
+             <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="اكتب المعنى... أو اضغط تابع للتخطي" dir="rtl" style="text-align:right;">
+             <p style="text-align:center;font-size:11px;color:var(--muted);margin:4px 0 0;">الكيبورد العربي؟ اضغط "تابع" للتخطي بدون نقاط</p>`;
+    qc.innerHTML = html;
+    currentItem.cx = c.ar;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+  
+  else if (qItem.type === 'mcq_it') {
+    let pool2 = qItem.pool || CHUNKS;
+    let prep = qItem.chunk.it.split(' ')[0];
+    let alts = pool2.filter(x=>x.it!==qItem.chunk.it && x.it.startsWith(prep));
+    if(alts.length<3){ const extra=pool2.filter(x=>x.it!==qItem.chunk.it&&!alts.includes(x)); alts=[...new Map([...alts,...extra].map(x=>[x.it,x])).values()]; }
+    let opts = shuffle([qItem.chunk, ...shuffle(alts).slice(0,3)]);
+    
+    html += `<h2 class="q-title">الترجمة الإيطالية هي:</h2>
+             <div class="word-card word-card-ar">${qItem.chunk.ar}</div>
+             <div class="mcq-grid">${opts.map(o => `<div class="mcq-opt" dir="ltr" data-ans="${o.it.replace(/'/g,"\\'")}" data-correct="${qItem.chunk.it.replace(/'/g,"\\'")}" onclick="chkOptSafe(this, false)">${o.it}</div>`).join('')}</div>`;
+    qc.innerHTML = html;
+    currentItem.cx = qItem.chunk.it;
+  }
+  
+  else if (qItem.type === 'write') {
+    html += `<h2 class="q-title">تذكر و أكتب الإيطالي 🇮🇹</h2>
+             <div class="word-card word-card-ar">${qItem.chunk.ar}</div>
+             <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="أكتب...">`;
+    qc.innerHTML = html;
+    currentItem.cx = qItem.chunk.it;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — DECOMPOSE ══ */
+  else if (qItem.type === 'setG_decompose') {
+    let ch = qItem.chunk;
+    let safeIt = ch.it.replace(/'/g,"\'");
+    // show examples
+    let exHtml = ch.examples ? `<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:14px;">
+      ${ch.examples.map(e=>`<div style="background:#e3f2fd;border-radius:8px;padding:5px 11px;font-size:12px;font-weight:700;direction:ltr;color:var(--blue);">${e.it} <span style="color:var(--muted);direction:rtl;">${e.ar}</span></div>`).join('')}
+    </div>` : '';
+    html += `<h2 class="q-title">فك هذه الصيغة 🔍</h2>
+      <div class="word-card" onclick="playTTS('${safeIt}')" style="font-size:42px;">${ch.it} 🔊</div>
+      ${exHtml}
+      <div class="hint-box">📌 مثال: NEL = <b dir="ltr">in + il</b> | ALLA = <b dir="ltr">a + la</b></div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="حرف الجر + أداة التعريف  (مثال: a + il)" dir="ltr">`;
+    qc.innerHTML = html;
+    currentItem.cx = ch.decomp;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — COMBINE ══ */
+  else if (qItem.type === 'setG_combine') {
+    let ch = qItem.chunk;
+    let prepPart = ch.prep;
+    let artPart  = ch.art;
+    let exHtml = ch.examples && ch.examples[0]
+      ? `<div class="hint-box" style="margin-bottom:12px;">📌 مثال على الاستخدام: <b dir="ltr">${ch.examples[0].it}</b> — ${ch.examples[0].ar}</div>`
+      : '';
+    html += `<h2 class="q-title">ادمج وكوِّن الصيغة 🔗</h2>
+      <div class="word-card word-card-ar" style="font-size:26px;direction:ltr;"><b>${prepPart}</b> + <b>${artPart}</b> = <span style="color:var(--muted);">?</span></div>
+      ${exHtml}
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="الصيغة المدمجة..." dir="ltr" style="text-transform:uppercase;">`;
+    qc.innerHTML = html;
+    currentItem.cx = ch.it.toLowerCase();
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — FILL BLANK ══ */
+  else if (qItem.type === 'setG_fill_blank') {
+    let s = qItem.sentence;
+    let blank = s.blank.replace('___', '<span style="color:var(--blue);font-weight:900;text-decoration:underline dotted 2px;font-size:28px;">___</span>');
+    html += `<h2 class="q-title">املأ الفراغ 📝</h2>
+      <div class="word-card word-card-ar" style="font-size:22px;direction:ltr;text-align:center;">${blank}</div>
+      <div style="text-align:center;font-size:15px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${s.ar}</div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="الصيغة المناسبة..." dir="ltr">`;
+    qc.innerHTML = html;
+    currentItem.cx = s.answer;
+    currentItem.gSentence = s;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — CONTEXT PICK ══ */
+  else if (qItem.type === 'setG_context_pick') {
+    let s = qItem.sentence;
+    let pool = qItem.pool || SET_G_CHUNKS;
+    // distractors from same prep
+    let samePrepPool = pool.filter(x=>x.prep===s.prep && x.it.toLowerCase()!==s.answer);
+    let diffPool     = pool.filter(x=>x.prep!==s.prep && x.it.toLowerCase()!==s.answer);
+    let distractors  = shuffle([...samePrepPool,...diffPool]).slice(0,3).map(x=>x.it.toLowerCase());
+    // ensure 4 unique options
+    let opts = shuffle([s.answer, ...distractors.slice(0,3)]);
+    // if not 4 unique, pad
+    let allOpts = pool.map(x=>x.it.toLowerCase()).filter(x=>x!==s.answer);
+    while(opts.length < 4) { let o = allOpts.find(x=>!opts.includes(x)); if(!o) break; opts.push(o); }
+    opts = shuffle(opts.slice(0,4));
+    let blank = s.blank.replace('___', '<span style="color:var(--blue);font-weight:900;font-size:28px;">___</span>');
+    html += `<h2 class="q-title">اختر الصيغة الصحيحة ✅</h2>
+      <div class="word-card word-card-ar" style="font-size:22px;direction:ltr;text-align:center;">${blank}</div>
+      <div style="text-align:center;font-size:15px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${s.ar}</div>
+      <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+        ${opts.map(o=>`<div class="mcq-opt" dir="ltr" style="font-size:20px;font-weight:900;" data-ans="${o}" data-correct="${s.answer}" onclick="chkOptSafe(this, false)">${o}</div>`).join('')}
+      </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = s.answer;
+    currentItem.gSentence = s;
+  }
+
+  /* ══ SET G — SENTENCE TRANSLATE ══ */
+  else if (qItem.type === 'setG_sentence_translate') {
+    let s = qItem.sentence;
+    html += `<h2 class="q-title">ترجم إلى الإيطالية 🇮🇹</h2>
+      <div class="word-card word-card-ar">${s.ar}</div>
+      <div class="hint-box" style="font-size:12px;">💡 ركز على الصيغة المدمجة: <b dir="ltr">${s.prep} + ${s.art} = ${s.answer}</b></div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="اكتب الجملة كاملة..." dir="ltr">`;
+    qc.innerHTML = html;
+    currentItem.cx = s.full.toLowerCase().replace(/[.,!?]/g,'');
+    currentItem.gSentence = s;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET G — MISTAKES QUIZ ══ */
+  else if (qItem.type === 'setG_mistakes_quiz') {
+    let m = qItem.mistake;
+    let opts = shuffle([m.correct, m.wrong]);
+    html += `<h2 class="q-title">ما الصيغة الصحيحة؟ ⚠️</h2>
+      <div class="hint-box" style="background:#fff3e0;border-color:var(--orange);">🚫 خطأ شائع — اختر الصواب</div>
+      <div class="mcq-grid">
+        ${opts.map(o=>`<div class="mcq-opt" dir="ltr" style="font-size:18px;font-weight:800;" data-ans="${o.replace(/"/g,'&quot;')}" data-correct="${m.correct.replace(/"/g,'&quot;')}" onclick="chkOptSafe(this, false)">${o}</div>`).join('')}
+      </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = m.correct;
+    currentItem.gMistake = m;
+  }
+
+  /* ══ NEW: mcq_context — اختر الحرف الصح من السياق ══ */
+  else if (qItem.type === 'mcq_context') {
+    let c = qItem.chunk;
+    let ctx = qItem.sentence || c; /* جملة السياق */
+    /* أخذ أول كلمة كحرف الجر */
+    let prep = c.it.split(' ')[0];
+    let pool = qItem.pool || SET_F_CHUNKS;
+    /* خيارات: حروف جر بسيطة مختلفة */
+    let altPreps = shuffle(pool.filter(x => x.it.split(' ')[0] !== prep)).slice(0,3);
+    let opts = shuffle([c, ...altPreps]);
+    let sentHtml = ctx.it ? `<div class="hint-box" dir="ltr" style="font-size:15px; text-align:center;">
+      "${ctx.it.replace(c.it, '<span style=\"background:var(--blue);color:#fff;padding:2px 6px;border-radius:4px;\">___</span>')}"
+    </div>` : '';
+    html += `<h2 class="q-title">اختر حرف الجر الصحيح:</h2>
+             ${sentHtml}
+             <div class="word-card word-card-ar">${ctx.ar || c.ar}</div>
+             <div class="mcq-grid">${opts.map(o => `<div class="mcq-opt" dir="ltr" style="font-size:20px;font-weight:900;"
+               data-ans="${o.it.split(' ')[0]}"
+               data-correct="${prep}"
+               onclick="chkOptSafe(this, false)">${o.it.split(' ')[0].toUpperCase()}</div>`).join('')}</div>`;
+    qc.innerHTML = html;
+    currentItem.cx = prep;
+  }
+
+  /* ══ NEW: recall_prep — ما معنى هذا الحرف؟ (بدون hint) ══ */
+  else if (qItem.type === 'recall_prep') {
+    let c = qItem.chunk;
+    /* فقط حروف الجر البسيطة من SET_F */
+    let pool = SET_F_CHUNKS;
+    let candidates = shuffle(pool.filter(x => x.it !== c.it));
+    let chosen = []; let usedAr = new Set([c.ar]);
+    for(let x of candidates){ if(!usedAr.has(x.ar)){ usedAr.add(x.ar); chosen.push(x); } if(chosen.length===3) break; }
+    if(chosen.length<3) chosen.push(...candidates.filter(x=>!chosen.includes(x)).slice(0,3-chosen.length));
+    let opts = shuffle([c, ...chosen]);
+    html += `<h2 class="q-title">ما معنى هذا الحرف؟</h2>
+             <div class="word-card" style="font-size:64px;font-weight:900;color:var(--purple);"
+               onclick="playTTS('${c.it}')">${c.it.toUpperCase()} 🔊</div>
+             <div class="mcq-grid">${opts.map(o => `<div class="mcq-opt"
+               data-ans="${o.ar.replace(/"/g,'&quot;')}"
+               data-correct="${c.ar.replace(/"/g,'&quot;')}"
+               onclick="chkOptSafe(this, false)">
+               <span style="font-size:13px;line-height:1.5;">${o.ar}</span>
+             </div>`).join('')}</div>`;
+    qc.innerHTML = html;
+    currentItem.cx = c.ar;
+  }
+
+  /* ══ NEW: sort_prep — صنّف المقطع تحت حرف الجر الصح ══ */
+  else if (qItem.type === 'sort_prep') {
+    let c = qItem.chunk;
+    let prep = c.it.split(' ')[0].toUpperCase();
+    let allPreps = [...new Set(SET_F_CHUNKS.map(x => x.it.split(' ')[0].toUpperCase()))];
+    let wrongPreps = shuffle(allPreps.filter(p => p !== prep)).slice(0,3);
+    let opts = shuffle([prep, ...wrongPreps]);
+    html += `<h2 class="q-title">هذا المقطع ينتمي لأي حرف جر؟</h2>
+             <div class="word-card" onclick="playTTS('${c.it.replace(/'/g,"\'")}')">${c.it} 🔊</div>
+             <div style="text-align:center;font-size:14px;font-weight:700;color:var(--muted);margin-bottom:12px;">${c.ar}</div>
+             <div class="mcq-grid">${opts.map(o => `<div class="mcq-opt" dir="ltr"
+               style="font-size:24px;font-weight:900;"
+               data-ans="${o}"
+               data-correct="${prep}"
+               onclick="chkOptSafe(this, false)">${o}</div>`).join('')}</div>`;
+    qc.innerHTML = html;
+    currentItem.cx = prep;
+  }
+
+
+  /* ═══════════════════════════ LAYER 1: الكلمة (VOCABULARY) ═══════════════════════════ */
+  
+  // عرض الكلمة ومعناها
+  else if (qItem.type === 'layer1_show_word') {
+    let u = qItem.unit;
+    let v = u.vocab;
+    let genderIcon = v.gender === 'maschile' ? '🚹' : '🚺';
+    let genderText = v.gender === 'maschile' ? 'مذكر' : 'مؤنث';
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--teal);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 1 — الكلمة</span>
+      </div>
+      <h2 class="q-title">تعرّف على الكلمة الأساسية</h2>
+      <div class="word-card" style="font-size:42px;cursor:pointer;" onclick="playTTS('${v.article} ${v.word}')">${v.word} 🔊</div>
+      <div style="text-align:center;font-size:24px;font-weight:800;color:var(--text);margin-bottom:12px;">${v.ar}</div>
+      <div style="display:flex;justify-content:center;gap:12px;margin-bottom:16px;">
+        <span style="background:var(--blue-lt);color:var(--blue);padding:6px 14px;border-radius:10px;font-weight:800;font-size:14px;">${genderIcon} ${genderText}</span>
+        <span style="background:var(--bg);color:var(--text);padding:6px 14px;border-radius:10px;font-weight:800;font-size:14px;direction:ltr;">${v.article} ${v.word}</span>
+      </div>
+      <div class="hint-box" style="text-align:center;">
+        <b dir="ltr">${v.example.it}</b><br>
+        <span style="color:var(--muted);">${v.example.ar}</span>
+      </div>
+    `;
+    qc.innerHTML = html;
+    $('main-btn').textContent = "فهمت، تابع ←";
+    waiting = true;
+    playTTS(v.article + ' ' + v.word);
+  }
+  
+  // سؤال عن معنى الكلمة
+  else if (qItem.type === 'layer1_mcq_meaning') {
+    let u = qItem.unit;
+    let v = u.vocab;
+    // خيارات من وحدات أخرى
+    let otherUnits = shuffle(LEARNING_UNITS.filter(x => x.id !== u.id && x.vocab.ar !== v.ar)).slice(0, 3);
+    let opts = shuffle([v.ar, ...otherUnits.map(x => x.vocab.ar)]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--teal);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 1 — الكلمة</span>
+      </div>
+      <h2 class="q-title">ما معنى هذه الكلمة؟</h2>
+      <div class="word-card" onclick="playTTS('${v.word}')">${v.word} 🔊</div>
+      <div class="mcq-grid">
+        ${opts.map(o => `<div class="mcq-opt" data-ans="${o.replace(/"/g,'&quot;')}" data-correct="${v.ar.replace(/"/g,'&quot;')}" onclick="chkOptSafe(this, true)">${o.split('/')[0]}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = v.ar;
+    playTTS(v.word);
+  }
+  
+  // سؤال عن جنس الكلمة
+  else if (qItem.type === 'layer1_mcq_gender') {
+    let u = qItem.unit;
+    let v = u.vocab;
+    let cx = v.gender === 'maschile' ? 'm' : 'f';
+    let artHint = v.article;
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--teal);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 1 — الكلمة</span>
+      </div>
+      <h2 class="q-title">ما جنس كلمة "${v.word}"؟</h2>
+      <div class="word-card" onclick="playTTS('${v.word}')">${v.word} 🔊</div>
+      <div style="text-align:center;font-size:16px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${v.ar}</div>
+      <div class="hint-box"> فكّر: الجنس هو؟ فأداة التعريف هي؟ <b dir="ltr">${artHint}</b></div>
+      <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="mcq-opt" style="font-size:20px;" data-ans="m" data-correct="${cx}" onclick="chkOptSafe(this, true)">مذكر 🚹<br><span dir="ltr" style="font-size:13px;opacity:.7;">il / lo / l'</span></div>
+        <div class="mcq-opt" style="font-size:20px;" data-ans="f" data-correct="${cx}" onclick="chkOptSafe(this, true)">مؤنث 🚺<br><span dir="ltr" style="font-size:13px;opacity:.7;">la / l'</span></div>
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = cx;
+  }
+  
+  /* ═══════════════════════════ LAYER 2: حرف الجر (PREPOSITION) ═══════════════════════════ */
+  
+  // عرض حرف الجر ومعناه
+  else if (qItem.type === 'layer2_show_prep') {
+    let u = qItem.unit;
+    let p = u.prep;
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--blue);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 2 — حرف الجر</span>
+      </div>
+      <h2 class="q-title">تعرّف على حرف الجر</h2>
+      <div class="word-card" style="font-size:56px;color:var(--purple);" onclick="playTTS('${p.letter}')">${p.letter.toUpperCase()} 🔊</div>
+      <div style="text-align:center;font-size:22px;font-weight:800;color:var(--text);margin-bottom:14px;">${p.meaning}</div>
+      <div class="hint-box" style="text-align:right;line-height:1.8;">
+        <b>لماذا نستخدمه هنا؟</b><br>
+        ${p.why_here}<br><br>
+        <b>مثال:</b><br>
+        <span dir="ltr" style="color:var(--blue);font-weight:900;">${p.example.it}</span><br>
+        <span style="color:var(--muted);">${p.example.ar}</span>
+      </div>
+    `;
+    qc.innerHTML = html;
+    $('main-btn').textContent = "فهمت، تابع ←";
+    waiting = true;
+    playTTS(p.letter);
+  }
+  
+  // سؤال عن معنى حرف الجر
+  else if (qItem.type === 'layer2_mcq_prep_meaning') {
+    let u = qItem.unit;
+    let p = u.prep;
+    let prepMeanings = {
+      'a': 'إلى / في',
+      'da': 'من / عند',
+      'in': 'في / بـ',
+      'su': 'على',
+      'di': 'من / لـ'
+    };
+    let wrongMeanings = shuffle(Object.values(prepMeanings).filter(m => m !== p.meaning)).slice(0,3);
+    let opts = shuffle([p.meaning, ...wrongMeanings]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--blue);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 2 — حرف الجر</span>
+      </div>
+      <h2 class="q-title">ما معنى حرف الجر "${p.letter.toUpperCase()}"؟</h2>
+      <div class="word-card" style="font-size:56px;color:var(--purple);" onclick="playTTS('${p.letter}')">${p.letter.toUpperCase()} 🔊</div>
+      <div class="mcq-grid">
+        ${opts.map(o => `<div class="mcq-opt" data-ans="${o.replace(/"/g,'&quot;')}" data-correct="${p.meaning.replace(/"/g,'&quot;')}" onclick="chkOptSafe(this, true)">${o}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = p.meaning;
+  }
+  
+  // سؤال لماذا نستخدم هذا الحرف
+  else if (qItem.type === 'layer2_mcq_why_prep') {
+    let u = qItem.unit;
+    let p = u.prep;
+    let v = u.vocab;
+    let whyOptions = [
+      'لأننا نذهب إلى مكان (وجهة)',
+      'لأننا نعود من مكان (مصدر)',
+      'لأن الشيء فوق سطح ما',
+      'لأننا داخل مكان مغلق',
+      'للتعبير عن الملكية أو البعضية'
+    ];
+    let opts = shuffle([p.why_here, ...whyOptions.filter(x => x !== p.why_here).slice(0,3)]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--blue);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 2 — حرف الجر</span>
+      </div>
+      <h2 class="q-title">لماذا نستخدم "${p.letter.toUpperCase()}" مع "${v.word}"؟</h2>
+      <div style="display:flex;justify-content:center;gap:10px;margin-bottom:16px;">
+        <span class="word-card" style="font-size:28px;padding:12px 20px;color:var(--purple);">${p.letter}</span>
+        <span style="font-size:28px;font-weight:900;color:var(--muted);align-self:center;">+</span>
+        <span class="word-card" style="font-size:28px;padding:12px 20px;">${v.word}</span>
+      </div>
+      <div class="mcq-grid">
+        ${opts.map(o => `<div class="mcq-opt" style="font-size:14px;text-align:right;line-height:1.5;" data-ans="${o.replace(/"/g,'&quot;')}" data-correct="${p.why_here.replace(/"/g,'&quot;')}" onclick="chkOptSafe(this, true)">${o}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = p.why_here;
+  }
+  
+  /* ═══════════════════════════ LAYER 3: منطق الدمج (FUSION) ═══════════════════════════ */
+  
+  // عرض كيفية الدمج
+  else if (qItem.type === 'layer3_show_fusion') {
+    let u = qItem.unit;
+    let f = u.fusion;
+    let v = u.vocab;
+    let p = u.prep;
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--purple);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 3 — الدمج</span>
+      </div>
+      <h2 class="q-title">كيف يحدث الدمج؟</h2>
+      <div style="text-align:center;padding:20px;background:linear-gradient(135deg,#f0f7ff,#fff);border-radius:16px;border:2px solid var(--blue-lt);margin-bottom:16px;">
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:16px;">
+          <span style="font-size:32px;font-weight:900;color:var(--purple);background:#f3e5f5;padding:10px 18px;border-radius:12px;">${p.letter}</span>
+          <span style="font-size:28px;font-weight:900;color:var(--muted);">+</span>
+          <span style="font-size:32px;font-weight:900;color:var(--blue);background:var(--blue-lt);padding:10px 18px;border-radius:12px;">${v.article}</span>
+        </div>
+        <div style="font-size:28px;color:var(--muted);margin-bottom:10px;">↓</div>
+        <div style="font-size:42px;font-weight:900;color:var(--green);background:#e8f5e9;padding:12px 24px;border-radius:14px;display:inline-block;" onclick="playTTS('${f.result}')">${f.result.toUpperCase()} 🔊</div>
+      </div>
+      <div class="hint-box" style="text-align:right;line-height:1.8;">
+        <b>القاعدة:</b> ${f.rule}<br><br>
+        <b>الشرح:</b> ${f.explanation}
+      </div>
+    `;
+    qc.innerHTML = html;
+    $('main-btn').textContent = "فهمت، تابع ←";
+    waiting = true;
+    playTTS(f.result);
+  }
+  
+  // سؤال عن نتيجة الدمج
+  else if (qItem.type === 'layer3_mcq_fusion_result') {
+    let u = qItem.unit;
+    let f = u.fusion;
+    let v = u.vocab;
+    let p = u.prep;
+    // خيارات من صيغ مدمجة أخرى
+    let allResults = LEARNING_UNITS.map(x => x.fusion.result.toLowerCase());
+    let uniqueResults = [...new Set(allResults)].filter(x => x !== f.result.toLowerCase());
+    let opts = shuffle([f.result.toLowerCase(), ...shuffle(uniqueResults).slice(0,3)]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--purple);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 3 — الدمج</span>
+      </div>
+      <h2 class="q-title">ما نتيجة الدمج؟</h2>
+      <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:20px;">
+        <span style="font-size:32px;font-weight:900;color:var(--purple);background:#f3e5f5;padding:10px 18px;border-radius:12px;">${p.letter}</span>
+        <span style="font-size:28px;font-weight:900;color:var(--muted);">+</span>
+        <span style="font-size:32px;font-weight:900;color:var(--blue);background:var(--blue-lt);padding:10px 18px;border-radius:12px;">${v.article}</span>
+        <span style="font-size:28px;font-weight:900;color:var(--muted);">=</span>
+        <span style="font-size:32px;font-weight:900;color:var(--green);">?</span>
+      </div>
+      <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+        ${opts.map(o => `<div class="mcq-opt" dir="ltr" style="font-size:24px;font-weight:900;text-transform:uppercase;" data-ans="${o}" data-correct="${f.result.toLowerCase()}" onclick="chkOptSafe(this, true)">${o}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = f.result.toLowerCase();
+  }
+  
+  // سؤال لماذا هذه النتيجة وليس غيرها
+  else if (qItem.type === 'layer3_explain_why') {
+    let u = qItem.unit;
+    let f = u.fusion;
+    let v = u.vocab;
+    let ruleOptions = [
+      'مذكر مفرد يبدأ بساكن عادي',
+      'مؤنث مفرد يبدأ بساكن',
+      'مفرد يبدأ بحرف متحرك',
+      'مذكر يبدأ بـ s+ساكن أو z',
+      'جمع مذكر عادي',
+      'جمع مؤنث'
+    ];
+    let opts = shuffle([f.rule, ...ruleOptions.filter(x => x !== f.rule).slice(0,3)]);
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--purple);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 3 — الدمج</span>
+      </div>
+      <h2 class="q-title">لماذا نستخدم "${f.result.toUpperCase()}" وليس صيغة أخرى؟</h2>
+      <div style="text-align:center;margin-bottom:16px;">
+        <span style="font-size:18px;color:var(--muted);">الكلمة:</span>
+        <span style="font-size:22px;font-weight:900;color:var(--blue);margin:0 8px;" dir="ltr">${v.article} ${v.word}</span>
+      </div>
+      <div class="hint-box" style="margin-bottom:16px;">💡 فكّر في: جنس الكلمة، نوع الحرف الذي تبدأ به</div>
+      <div class="mcq-grid">
+        ${opts.map(o => `<div class="mcq-opt" style="font-size:14px;text-align:right;" data-ans="${o.replace(/"/g,'&quot;')}" data-correct="${f.rule.replace(/"/g,'&quot;')}" onclick="chkOptSafe(this, true)">${o}</div>`).join('')}
+      </div>
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = f.rule;
+  }
+  
+  /* ═══════════════════════════ LAYER 4: التطبيق (APPLICATION) ═══════════════════════════ */
+  
+  // املأ الفراغ مع تلميح
+  else if (qItem.type === 'layer4_fill_blank_hint') {
+    let u = qItem.unit;
+    let e = u.expression;
+    let f = u.fusion;
+    let sentence = e.sentences[0];
+    let blank = sentence.it.replace(new RegExp(f.result, 'i'), '<span style="color:var(--blue);font-weight:900;text-decoration:underline dotted 2px;font-size:24px;">___</span>');
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--green);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 4 — التطبيق</span>
+      </div>
+      <h2 class="q-title">املأ الفراغ</h2>
+      <div class="word-card word-card-ar" style="font-size:20px;direction:ltr;text-align:center;">${blank}</div>
+      <div style="text-align:center;font-size:15px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${sentence.ar}</div>
+      <div class="hint-box" style="text-align:center;">💡 تلميح: <b dir="ltr">${f.formula}</b></div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="الصيغة المدمجة..." dir="ltr" style="text-transform:lowercase;">
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = f.result.toLowerCase();
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+  
+  // اكتب التعبير الكامل
+  else if (qItem.type === 'layer4_write_expression') {
+    let u = qItem.unit;
+    let e = u.expression;
+    let v = u.vocab;
+    let f = u.fusion;
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--green);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 4 — التطبيق</span>
+      </div>
+      <h2 class="q-title">اكتب التعبير الكامل</h2>
+      <div class="word-card word-card-ar" style="font-size:22px;">${e.ar.split('/')[0]}</div>
+      <div class="hint-box" style="text-align:center;">
+        الكلمة: <b dir="ltr">${v.word}</b> | حرف الجر: <b dir="ltr">${u.prep.letter}</b>
+      </div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="اكتب بالإيطالية..." dir="ltr">
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = e.it.toLowerCase();
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+  
+  // ترجمة جملة كاملة
+  else if (qItem.type === 'layer4_translate') {
+    let u = qItem.unit;
+    let e = u.expression;
+    let sentence = e.sentences[Math.floor(Math.random() * e.sentences.length)];
+    html += `
+      <div style="text-align:center;margin-bottom:10px;">
+        <span style="background:var(--green);color:#fff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:800;">الطبقة 4 — التطبيق</span>
+      </div>
+      <h2 class="q-title">ترجم إلى الإيطالية</h2>
+      <div class="word-card word-card-ar" style="font-size:20px;">${sentence.ar}</div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="اكتب الجملة كاملة..." dir="ltr">
+    `;
+    qc.innerHTML = html;
+    currentItem.cx = sentence.it.toLowerCase().replace(/[.,!?]/g,'');
+    currentItem.fullSentence = sentence;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  // -- SET A TYPES --
+  else if (qItem.type === 'setA_id') {
+    let w = qItem.word;
+    let cx = (w.startType==='vowel') ? 'yes' : 'no';
+    let firstLetter = w.it[0].toUpperCase();
+    html += `<h2 class="q-title">هل تبدأ بحرف متحرك؟</h2>
+             <div class="word-card" onclick="playTTS('${w.it.replace(/\x27/g,"\\'")}')">${w.it} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar||''}</div>
+             <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+               <div class="mcq-opt" style="font-size:20px" data-ans="yes" data-correct="${cx}" onclick="chkOptSafe(this, true)">نعم ✅<br><span style="font-size:13px; opacity:.7">${firstLetter} = متحرك</span></div>
+               <div class="mcq-opt" style="font-size:20px" data-ans="no"  data-correct="${cx}" onclick="chkOptSafe(this, true)">لا ❌<br><span style="font-size:13px; opacity:.7">${firstLetter} = ساكن</span></div>
+             </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = cx;
+    currentItem.sTts = w.article + ' ' + w.it;
+  }
+  else if (qItem.type === 'setA_art') {
+    let w = qItem.word;
+    let ansStr = w.article;
+
+    html += `<h2 class="q-title">اختر أداة التعريف الصحيحة:</h2>
+             <div class="word-card" onclick="playTTS('${w.it.replace(/'/g,"\\'")}')">___ ${w.it} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar||''}</div>
+             <div class="mcq-grid" style="grid-template-columns:repeat(2,1fr)">
+               ${shuffle(["il", "la", "lo", "l'"]).map(a=> `<div class="mcq-opt" dir="ltr" style="font-size:22px; font-weight:900;" data-ans="${a}" data-correct="${ansStr}" onclick="chkOptSafe(this, true)">${a}</div>`).join('')}
+             </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = ansStr;
+    currentItem.sTts = ansStr + ' ' + w.it;
+  }
+  else if (qItem.type === 'setA_write') {
+    let w = qItem.word;
+    let ansWrite = w.article;
+    html += `<h2 class="q-title">اكتب أداة التعريف:</h2>
+             <div class="word-card" onclick="playTTS('${w.it.replace(/'/g,"\\'")}')">___ ${w.it} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar||''}</div>
+             <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="il / la / lo / l'">`;
+    qc.innerHTML = html;
+    currentItem.cx = ansWrite;
+    currentItem.sTts = ansWrite + ' ' + w.it;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  // -- SET B TYPES --
+  else if (qItem.type === 'setB_gender') {
+    let w = qItem.word;
+    let msc = (w.gender === 'm') ? 'm' : 'f';
+    let ht = '';
+    if(w.isException) {
+      ht = `<div class="hint-box" style="border-color:var(--orange); background:#fff3e0;">
+              ⚠️ استثناء! النهاية <b dir="ltr">-${w.ending.toUpperCase()}</b> هنا عكس القاعدة العادية<br>
+              <span style="font-size:12px; color:var(--muted);">هذه الكلمة تُحفظ بشكل منفصل</span>
+            </div>`;
+    } else if(w.ending==='e') {
+      ht = `<div class="hint-box">تنتهي بـ <b dir="ltr">-E</b> → الجنس لا يُستنتج من النهاية، يُحفظ 📝</div>`;
+    } else if(w.ending==='o') {
+      ht = `<div class="hint-box">تنتهي بـ <b dir="ltr">-O</b> → القاعدة: غالباً مذكر 🚹</div>`;
+    } else if(w.ending==='a') {
+      ht = `<div class="hint-box">تنتهي بـ <b dir="ltr">-A</b> → القاعدة: غالباً مؤنث 🚺</div>`;
+    }
+    html += `<h2 class="q-title">ما جنس هذه الكلمة؟</h2>
+             ${ht}
+             <div class="word-card" onclick="playTTS('${w.it.replace(/'/g,"\\'")}')">${w.it} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar||''}</div>
+             <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+               <div class="mcq-opt" style="font-size:20px;" data-ans="m" data-correct="${msc}" onclick="chkOptSafe(this, true)">مُذكر 🚹<br><span dir="ltr" style="font-size:14px; opacity:.7">il / lo / l'</span></div>
+               <div class="mcq-opt" style="font-size:20px;" data-ans="f" data-correct="${msc}" onclick="chkOptSafe(this, true)">مؤنث 🚺<br><span dir="ltr" style="font-size:14px; opacity:.7">la / l'</span></div>
+             </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = msc;
+    // Play article+word after answer (article not shown before to avoid giving away gender)
+    let artBg = getArticleB(w);
+    currentItem.sTts = artBg + ' ' + w.it;
+  }
+  else if (qItem.type === 'setB_write') {
+    let w = qItem.word;
+    let rMsc = (w.gender==='m'); let vw = (w.it.match(/^[aeiou]/i));
+    let crx = getArticleB(w);
+    let endNote = w.isException
+      ? `⚠️ استثناء: <b dir="ltr">${w.it}</b> → <b dir="ltr">${crx}</b>`
+      : w.it.match(/^[aeiou]/i) ? `تبدأ بمتحرك → <b dir="ltr">l'</b>`
+      : (crx==='lo') ? `مذكر يبدأ بـ ${w.it[0].toUpperCase()} → <b dir="ltr">lo</b>`
+      : `تنتهي بـ <b dir="ltr">-${w.ending.toUpperCase()}</b> → ${rMsc?'مذكر 🚹':'مؤنث 🚺'} → <b dir="ltr">${crx}</b>`;
+    html += `<h2 class="q-title">اكتب أداة التعريف المناسبة:</h2>
+             <div class="hint-box">${endNote}</div>
+             <div class="word-card" onclick="playTTS('${w.it.replace(/'/g,"\\'")}')">___ ${w.it} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar||''}</div>
+             <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="il / la / l'">`;
+    qc.innerHTML = html;
+    currentItem.cx = crx;
+    currentItem.sTts = crx + ' ' + w.it;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  // -- SET C TYPES --
+  else if (qItem.type === 'setC_mcq') {
+    let w = qItem.word;
+    // Build a clear rule explanation from the article
+    const artExplain = {
+      "il":  "مذكر يبدأ بحرف ساكن عادي → <b dir='ltr'>il</b>",
+      "lo":  "مذكر يبدأ بـ Z أو S+ساكن → <b dir='ltr'>lo</b>",
+      "la":  "مؤنث يبدأ بحرف ساكن → <b dir='ltr'>la</b>",
+      "l'":  "يبدأ بحرف متحرك (A/E/I/O/U) → <b dir='ltr'>l'</b>"
+    };
+    let hintFull = `<b>${w.hint}</b><br><span style="font-size:12px; color:var(--muted); margin-top:4px; display:block;">${artExplain[w.article]||w.hint}</span>`;
+    html += `<h2 class="q-title">أيها أداة التعريف الصحيحة؟</h2>
+             <div class="hint-box">${hintFull}</div>
+             <div class="word-card" onclick="playTTS('${w.it.replace(/'/g,"\\'")}')">___ ${w.it} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar||''}</div>
+             <div class="mcq-grid" style="grid-template-columns:1fr 1fr">
+                ${shuffle(["il", "lo", "la", "l'"]).map(a=> `<div class="mcq-opt" dir="ltr" style="font-size:24px; font-weight:900;" data-ans="${a}" data-correct="${w.article}" onclick="chkOptSafe(this, true)">${a}</div>`).join('')}
+             </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = w.article;
+    currentItem.sTts = w.article + ' ' + w.it;
+  }
+  else if (qItem.type === 'setC_write') {
+    let w = qItem.word;
+    html += `<h2 class="q-title">اكتب أداة التعريف من الذاكرة:</h2>
+             ${qItem.hints ? `<div class="hint-box"><b>${w.hint}</b></div>`:'<div class="hint-box" style="border-color:var(--purple); color:var(--purple);">بدون مساعدة هذه المرة — فكّر: ساكن؟ متحرك؟ مذكر؟ مؤنث؟ 🧠</div>'}
+             <div class="word-card" onclick="playTTS('${w.it.replace(/'/g,"\\'")}')">___ ${w.it} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar||''}</div>
+             <input type="text" id="write-input" dir="ltr" autocomplete="off" spellcheck="false" placeholder="il / lo / la / l'">`;
+    qc.innerHTML = html;
+    currentItem.cx = w.article;
+    currentItem.sTts = w.article + ' ' + w.it;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  // -- SET D TYPES (Terminology Names) --
+  else if (qItem.type === 'setD_mcq_toAr') {
+    let t = qItem.term;
+    let opts = shuffle([...SET_D_TERMS]);
+    html += `<h2 class="q-title">ما معنى هذا المصطلح بالعربي؟</h2>
+             <div class="word-card" style="font-size:22px; line-height:1.4;" onclick="playTTS('${t.it.replace(/'/g,"\\'")}')" dir="ltr">${t.it} 🔊</div>
+             <div class="mcq-grid">
+               ${opts.map(o => `<div class="mcq-opt" data-ans="${o.it.replace(/'/g,"\\'")}" data-correct="${t.it.replace(/'/g,"\\'")}" onclick="chkOptSafe(this, true)">${o.ar}</div>`).join('')}
+             </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = t.it;
+    currentItem.sTts = t.it;
+  }
+  else if (qItem.type === 'setD_mcq_toIt') {
+    let t = qItem.term;
+    let opts = shuffle([...SET_D_TERMS]);
+    html += `<h2 class="q-title">ما الاسم الإيطالي لـ:</h2>
+             <div class="word-card word-card-ar" style="font-size:26px;">${t.ar}</div>
+             <div class="hint-box" style="font-size:13px; color:var(--muted);">💡 ${t.note}</div>
+             <div class="mcq-grid">
+               ${opts.map(o => `<div class="mcq-opt" dir="ltr" style="font-size:14px; font-weight:800;" data-ans="${o.it.replace(/'/g,"\\'")}" data-correct="${t.it.replace(/'/g,"\\'")}" onclick="chkOptSafe(this, true)">${o.it}</div>`).join('')}
+             </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = t.it;
+    currentItem.sTts = t.it;
+  }
+  else if (qItem.type === 'setD_write') {
+    let t = qItem.term;
+    html += `<h2 class="q-title">اكتب الاسم الإيطالي من الذاكرة:</h2>
+             <div class="word-card word-card-ar" style="font-size:26px;">${t.ar}</div>
+             <div class="hint-box" style="font-size:13px; color:var(--muted);">💡 ${t.note}</div>
+             <input type="text" id="write-input" dir="ltr" autocomplete="off" spellcheck="false" placeholder="اكتب المصطلح الإيطالي...">`;
+    qc.innerHTML = html;
+    currentItem.cx = t.it;
+    currentItem.sTts = t.it;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  // -- SET E TYPES --
+  else if (qItem.type === 'setE_mcq_plural') {
+    let w = qItem.word;
+    // Generate 3 wrong options: plausible wrong plural endings
+    const wrongSuffixes = (base) => {
+      let stem = base.slice(0,-1);
+      let last = base.slice(-1);
+      let wrongs = [];
+      if(last==='o') wrongs = [stem+'os', stem+'re', stem+'a'];
+      else if(last==='a') wrongs = [stem+'os', stem+'i', stem+'as'];
+      else if(last==='e') wrongs = [stem+'es', stem+'a', stem+'os'];
+      else wrongs = [base+'s', base+'i', base+'e'];
+      // filter accidental collision with correct
+      return wrongs.filter(x=>x!==w.itP).slice(0,3);
+    };
+    let wrongs = wrongSuffixes(w.it);
+    while(wrongs.length < 3) wrongs.push(w.it + 'x' + wrongs.length);
+    let opts = shuffle([w.itP, ...wrongs]);
+    html += `<h2 class="q-title">ما جمع هذه الكلمة؟</h2>
+             <div class="word-card" onclick="playTTS('${w.it.replace(/'/g,"\\'")}')"><span style="color:var(--muted); font-size:18px;">${w.artS}</span> ${w.it} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar}</div>
+             <div class="mcq-grid" style="grid-template-columns:1fr 1fr;">
+               ${opts.map(o=>`<div class="mcq-opt" dir="ltr" style="font-size:20px; font-weight:900;" data-ans="${o}" data-correct="${w.itP}" onclick="chkOptSafe(this, true)">${o}</div>`).join('')}
+             </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = w.itP;
+    currentItem.sTts = w.artP + ' ' + w.itP;
+  }
+  else if (qItem.type === 'setE_mcq_art') {
+    let w = qItem.word;
+    let opts = shuffle(['i', 'gli', 'le']);
+    html += `<h2 class="q-title">ما أداة التعريف للجمع؟</h2>
+             <div class="word-card" onclick="playTTS('${w.itP}')">${w.itP} <span style="font-size:16px">🔊</span></div>
+             <div style="text-align:center; font-size:17px; font-weight:700; color:var(--muted); margin:-8px 0 12px;">${w.ar}</div>
+             <div class="hint-box" style="font-size:13px;">مفرده: <b dir="ltr">${w.artS} ${w.it}</b></div>
+             <div class="mcq-grid" style="grid-template-columns:repeat(3,1fr);">
+               ${opts.map(o=>`<div class="mcq-opt" dir="ltr" style="font-size:24px; font-weight:900;" data-ans="${o}" data-correct="${w.artP}" onclick="chkOptSafe(this, true)">${o}</div>`).join('')}
+             </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = w.artP;
+    currentItem.sTts = w.artP + ' ' + w.itP;
+  }
+  else if (qItem.type === 'setE_write') {
+    let w = qItem.word;
+    html += `<h2 class="q-title">اكتب الجمع مع أداة التعريف:</h2>
+             <div class="hint-box">جمع: <b dir="ltr">${w.artS} ${w.it}</b> — اكتب الجمع كاملاً مع الأداة</div>
+             <div class="word-card word-card-ar">${w.ar}</div>
+             <input type="text" id="write-input" dir="ltr" autocomplete="off" spellcheck="false" placeholder="مثال: i libri">`;
+    qc.innerHTML = html;
+    currentItem.cx = w.artP + ' ' + w.itP;
+    currentItem.sTts = w.artP + ' ' + w.itP;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET I — SEE ══ */
+  else if (qItem.type === 'setI_see') {
+    let c = qItem.chunk;
+    let safeIt = c.it.replace(/'/g,"\\'");
+    let exHtml = c.examples.map(e =>
+      `<div style="background:#f8f9fa;border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px;">
+        <span dir="ltr" style="font-weight:900;color:var(--blue);font-size:15px;">${e.it}</span>
+        <span style="color:var(--muted);font-size:13px;font-weight:600;"> — ${e.ar}</span>
+      </div>`
+    ).join('');
+    html += `<h2 class="q-title">اقرأ واحفظ أداة الاستفهام</h2>
+      <div class="word-card" style="font-size:42px;cursor:pointer;" onclick="playTTS('${safeIt}')">${c.it} 🔊</div>
+      <div style="text-align:center;font-size:24px;font-weight:800;color:var(--text);margin-bottom:10px;">${c.ar}</div>
+      <div class="hint-box" style="text-align:right;margin-bottom:12px;">${c.note}</div>
+      <div style="font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px;">أمثلة:</div>
+      ${exHtml}`;
+    qc.innerHTML = html;
+    $('main-btn').textContent = "تابــع ←";
+    waiting = true;
+    playTTS(c.it);
+  }
+
+  /* ══ SET I — MCQ ══ */
+  else if (qItem.type === 'setI_mcq') {
+    let c = qItem.chunk;
+    let pool = qItem.pool || SET_I_CHUNKS;
+    let alts = shuffle(pool.filter(x => x.it !== c.it)).slice(0, 3);
+    let opts = shuffle([c, ...alts]);
+    html += `<h2 class="q-title">ما معنى هذه الكلمة؟</h2>
+      <div class="word-card" onclick="playTTS('${c.it.replace(/'/g,"\\'")}') "style="font-size:38px;">${c.it} 🔊</div>
+      <div class="mcq-grid">${opts.map(o =>
+        `<div class="mcq-opt" data-ans="${o.ar.replace(/"/g,'&quot;')}" data-correct="${c.ar.replace(/"/g,'&quot;')}" onclick="chkOptSafe(this, false)">
+          <span style="font-size:14px;line-height:1.4;">${o.ar}</span>
+        </div>`).join('')}</div>`;
+    qc.innerHTML = html;
+    currentItem.cx = c.ar;
+    currentItem.chunk = c;
+    playTTS(c.it);
+  }
+
+  /* ══ SET I — WRITE ══ */
+  else if (qItem.type === 'setI_write') {
+    let c = qItem.chunk;
+    html += `<h2 class="q-title">اكتب أداة الاستفهام بالإيطالي:</h2>
+      <div class="word-card word-card-ar" style="font-size:28px;">${c.ar}</div>
+      <div class="hint-box" style="font-size:12px;">${c.note}</div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="اكتب بالإيطالية..." dir="ltr">`;
+    qc.innerHTML = html;
+    currentItem.cx = c.it.toLowerCase();
+    currentItem.chunk = c;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET I — FILL BLANK ══ */
+  else if (qItem.type === 'setI_fill') {
+    let s = qItem.sentence;
+    let blank = s.blank.replace('___', '<span style="color:var(--blue);font-weight:900;text-decoration:underline dotted 2px;font-size:26px;">___</span>');
+    html += `<h2 class="q-title">أكمل الجملة بأداة الاستفهام المناسبة 📝</h2>
+      <div class="word-card word-card-ar" style="font-size:20px;direction:ltr;text-align:center;">${blank}</div>
+      <div style="text-align:center;font-size:15px;font-weight:700;color:var(--muted);margin:-8px 0 14px;">${s.ar}</div>
+      <input type="text" id="write-input" autocomplete="off" spellcheck="false" placeholder="quando / dove / come ..." dir="ltr">`;
+    qc.innerHTML = html;
+    currentItem.cx = s.answer.toLowerCase();
+    currentItem.sentence = s;
+    setTimeout(()=>{let b=$('write-input');if(b)b.focus();},50);
+  }
+
+  /* ══ SET I — MISTAKE QUIZ ══ */
+  else if (qItem.type === 'setI_mistake') {
+    let m = qItem.mistake;
+    let opts = shuffle([m.correct, m.wrong]);
+    html += `<h2 class="q-title">ما الجملة الصحيحة؟ ⚠️</h2>
+      <div class="hint-box" style="background:#fff3e0;border-color:var(--orange);">🚫 خطأ شائع — اختر الصواب</div>
+      <div class="mcq-grid">
+        ${opts.map(o =>
+          `<div class="mcq-opt" dir="ltr" style="font-size:15px;font-weight:800;text-align:center;"
+            data-ans="${o.replace(/"/g,'&quot;')}"
+            data-correct="${m.correct.replace(/"/g,'&quot;')}"
+            onclick="chkOptSafe(this, false)">${o}</div>`
+        ).join('')}
+      </div>`;
+    qc.innerHTML = html;
+    currentItem.cx = m.correct;
+    currentItem.mistake = m;
+  }
+
+  let inpp = $('write-input');
+  if(inpp) {
+    inpp.addEventListener('keydown', e => { if(e.key === 'Enter') handleMain(); });
+  }
+}
+
+
+// Safe version: reads correct answer from data-correct attribute (avoids apostrophe escaping bugs)
+function chkOptSafe(btnNode, playSnd) {
+  let correctAns = btnNode.getAttribute('data-correct');
+  chkOpt(btnNode, correctAns, playSnd);
+}
+
+// Global Validation
+function chkOpt(btnNode, correctAns, playSnd) {
+  if (pickedMcq || waiting) return;
+  pickedMcq = true;
+  
+  let chosenAns = btnNode.getAttribute('data-ans');
+  let passed = norm(chosenAns) === norm(correctAns);
+  currentItem.chosen = chosenAns;
+  
+  // Highlight
+  document.querySelectorAll('.mcq-opt').forEach(nd => {
+    nd.style.pointerEvents = 'none';
+    if(norm(nd.getAttribute('data-ans')) === norm(correctAns)) nd.classList.add('reveal');
+  });
+  if (!passed) btnNode.classList.add('wrong-pick');
+  
+  if (playSnd && appState.tts && currentItem.sTts) playTTS(currentItem.sTts);
+  else if (appState.tts && !currentItem.sTts) {
+    const ttsWord = currentItem.chunk?.it || currentItem.unit?.vocab?.word || null;
+    if(ttsWord && currentItem.type !== 'mcq_it') playTTS(ttsWord);
+  }
+  
+  triggerFeedback(passed, correctAns);
+}
+
+function handleMain() {
+  if (waiting) { moveNext(); return; }
+  
+  if (currentItem.type==='see') {
+    sessionStats.c++; moveNext(); return;
+  }
+  const G_INPUT_TYPES = ['setG_decompose','setG_combine','setG_fill_blank','setG_sentence_translate','setI_fill'];
+  if (!currentItem.type.includes('write') && !G_INPUT_TYPES.includes(currentItem.type)) return;
+  
+  let iNode = $('write-input');
+
+  // retryMode: تحقق من الإجابة الجديدة بدون إضافة إحصائيات
+  if(retryMode) {
+    if(!iNode || iNode.value.trim()==='') {
+      // فاضي في retry = غلط تاني → اعرض الإجابة وأوقف الكتابة
+      if(currentItem.type === 'write_ar') {
+        _revealWriteAr(iNode); return;
+      }
+      moveNext(); return;
+    }
+    let inp = norm(iNode.value);
+    let correct = norm(currentItem.cx);
+    let passedRetry = false;
+    if(currentItem.type === 'write_ar') {
+      let firstPart = norm(currentItem.cx.split('/')[0]);
+      passedRetry = inp === correct || inp === firstPart || (inp.length > 3 && correct.includes(inp));
+      if(!passedRetry) { _revealWriteAr(iNode); return; }
+    } else {
+      passedRetry = inp === correct;
+    }
+    iNode.style.borderColor = passedRetry ? 'var(--green)' : 'var(--red)';
+    iNode.style.background  = passedRetry ? '#e8f5e9' : 'var(--red-lt)';
+    if(passedRetry) {
+      retryMode = false;
+      waiting = true;
+      $('feedback-box').className = 'fb-correct';
+      $('main-btn').textContent = "تابــع ←";
+      if(appState.tts && currentItem.chunk) playTTS(currentItem.chunk.it);
+    }
+    return;
+  }
+
+  // المرة الأولى — فاضي = غلط، يكتب تاني
+  if(!iNode || iNode.value.trim()==='') {
+    if(currentItem.type === 'write_ar') {
+      sessionStats.w++;
+      iNode.style.borderColor = 'var(--red)';
+      iNode.style.background  = 'var(--red-lt)';
+      iNode.placeholder = 'اكتب الإجابة...';
+      retryMode = true;
+      let fb = $('feedback-box');
+      fb.className = 'fb-wrong';
+      fb.innerHTML = '❌ اكتب الإجابة أولاً';
+      fb.style.display = 'block';
+      $('main-btn').textContent = "تحقق ✓";
+      return;
+    }
+    return;
+  }
+
+  if (currentItem.type === 'write_ar') {
+    let inp = norm(iNode.value);
+    let fullAr = currentItem.cx;
+    let firstPart = norm(fullAr.split('/')[0]);
+    let passed = inp === norm(fullAr) || inp === firstPart ||
+                 (inp.length > 3 && norm(fullAr).includes(inp));
+    iNode.style.borderColor = passed ? 'var(--green)' : 'var(--red)';
+    iNode.style.background  = passed ? '#e8f5e9' : 'var(--red-lt)';
+    triggerFeedback(passed, fullAr);
+    if(!passed) retryMode = true;
+    return;
+  }
+
+  let passed = false;
+  let _t = currentItem.type;
+  let _userVal = iNode.value;
+  let _correctVal = currentItem.cx;
+
+  if(_t === 'setG_decompose') {
+    passed = normDecomp(_userVal) === normDecomp(_correctVal);
+  } else if(_t === 'setG_combine') {
+    passed = normCombine(_userVal) === normCombine(_correctVal);
+  } else if(_t === 'setG_sentence_translate') {
+    let _u = norm(_userVal); let _cv = norm(_correctVal);
+    let _s = currentItem.gSentence;
+    passed = _u === _cv || (_s && _u.includes(norm(_s.answer)) && _u.includes(norm(_s.prep)));
+  } else {
+    passed = norm(_userVal) === norm(_correctVal);
+  }
+
+  iNode.style.borderColor = passed ? 'var(--green)' : 'var(--red)';
+  iNode.style.background = passed ? '#e8f5e9' : 'var(--red-lt)';
+  
+  if(passed && appState.tts) {
+    let tw = currentItem.sTts || currentItem.chunk?.it;
+    if(tw) playTTS(tw);
+  }
+
+  triggerFeedback(passed, currentItem.cx);
+  if(!passed) retryMode=true;
+}
+
+// عرض الإجابة الصحيحة لـ write_ar بعد المحاولة الثانية
+function _revealWriteAr(iNode) {
+  if(iNode) {
+    iNode.value = currentItem.cx;
+    iNode.style.borderColor = 'var(--orange)';
+    iNode.style.background  = '#fff3e0';
+    iNode.disabled = true;
+  }
+  retryMode = false;
+  waiting = true;
+  let fb = $('feedback-box');
+  fb.className = 'fb-wrong';
+  fb.innerHTML = `❌ الإجابة الصحيحة: <b dir="ltr">${currentItem.chunk?.it||''}</b> = <b>${currentItem.cx}</b><br>
+    <div style="font-size:12px;color:#555;margin-top:6px;">${currentItem.chunk?.note||''}</div>`;
+  fb.style.display = 'block';
+  $('main-btn').textContent = "تابــع ←";
+}
+
+function triggerFeedback(passed, ctext) {
+  if (passed) sessionStats.c++; else sessionStats.w++;
+  
+  let fb = $('feedback-box');
+  fb.className = passed ? 'fb-correct' : 'fb-wrong';
+
+  // Build explanation based on question type
+  let explanation = '';
+  let ci = currentItem;
+
+  if (ci.chunk) {
+    // Core chunks: show the note — covers mcq_ar, mcq_it, write, see, mcq_note, write_ar
+    if (ci.type === 'mcq_note') {
+      explanation = `<div style="font-size:13px; font-weight:600; color:#555; margin-top:8px; line-height:1.6;">✅ القاعدة: ${ci.chunk.note||''}</div>`;
+    } else if (ci.type === 'write_ar') {
+      explanation = `<div style="font-size:13px; font-weight:600; color:#555; margin-top:8px; line-height:1.6;">
+        💡 ${ci.chunk.it} = <b>${ci.chunk.ar}</b><br>
+        <span style="color:var(--muted); font-size:12px;">${ci.chunk.note||''}</span>
+      </div>`;
+    } else {
+      explanation = `<div style="font-size:13px; font-weight:600; color:#555; margin-top:8px; line-height:1.6;">💡 ${ci.chunk.note||'أحسنت!'}</div>`;
+    }
+  } else if (ci.type === 'setA_id') {
+    let w = ci.word;
+    let isV = w.startType==='vowel';
+    explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.6; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${w.it}</b> تبدأ بـ <b dir="ltr">${w.it[0].toUpperCase()}</b> — ${isV ? `حرف متحرك → نكتب <b dir="ltr">l'</b>` : `حرف ساكن → نكتب <b dir="ltr">il / la / lo</b>`}
+    </div>`;
+  } else if (ci.type === 'setA_art' || ci.type === 'setA_write') {
+    let w = ci.word;
+    if(w) {
+      // وصف كل أداة بشكل مختصر
+      const artDesc = {
+        "il":  "مذكر + ساكن عادي",
+        "lo":  "مذكر + S+ساكن أو Z",
+        "la":  "مؤنث + ساكن",
+        "l'":  "أي جنس + متحرك"
+      };
+      // سبب الإجابة الصحيحة بناءً على خصائص الكلمة
+      let correctReason = '';
+      if(w.startType === 'vowel')
+        correctReason = `<b dir="ltr">${w.it}</b> تبدأ بحرف متحرك (<b dir="ltr">${w.it[0].toUpperCase()}</b>) → <b dir="ltr">l'</b>`;
+      else if(w.startType === 'z')
+        correctReason = `<b dir="ltr">${w.it}</b> تبدأ بـ <b dir="ltr">Z</b> → <b dir="ltr">lo</b>`;
+      else if(w.startType === 's_impure' && w.gender === 'm')
+        correctReason = `<b dir="ltr">${w.it}</b> مذكر + تبدأ بـ S+ساكن → <b dir="ltr">lo</b>`;
+      else if(w.startType === 's_impure' && w.gender === 'f')
+        correctReason = `<b dir="ltr">${w.it}</b> مؤنثة رغم S+ساكن → <b dir="ltr">la</b> وليس <b dir="ltr">lo</b>`;
+      else if(w.gender === 'f')
+        correctReason = `<b dir="ltr">${w.it}</b> مؤنثة + ساكن عادي → <b dir="ltr">la</b>`;
+      else
+        correctReason = `<b dir="ltr">${w.it}</b> مذكر + ساكن عادي → <b dir="ltr">il</b>`;
+
+      let wrongLine = '';
+      if(!passed && ci.chosen && ci.chosen !== w.article) {
+        wrongLine = `<div style="font-size:12px; color:#c0392b; margin-top:4px;">
+          ⚠️ <b dir="ltr">${ci.chosen}</b> = ${artDesc[ci.chosen]||''}
+        </div>`;
+      }
+
+      explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.7; font-weight:600; color:#333;">
+        💡 ${correctReason}
+        ${wrongLine}
+      </div>`;
+    }
+  } else if (ci.type === 'setB_gender') {
+    let w = ci.word;
+    if(w) {
+      let reason = w.isException
+        ? `⚠️ استثناء محفوظ: <b>${w.it}</b> تنتهي بـ <b dir="ltr">-${w.ending.toUpperCase()}</b> لكنها ${w.gender==='m'?'مذكر 🚹':'مؤنث 🚺'}`
+        : w.ending==='e' ? `تنتهي بـ <b dir="ltr">-E</b> → يُحفظ: <b>${w.it}</b> ${w.gender==='m'?'مذكر 🚹':'مؤنث 🚺'}`
+        : `تنتهي بـ <b dir="ltr">-${w.ending.toUpperCase()}</b> → ${w.gender==='m'?'مذكر 🚹':'مؤنث 🚺'}`;
+      explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.6; font-weight:600; color:#333;">💡 ${reason}</div>`;
+    }
+  } else if (ci.type === 'setD_mcq_toAr' || ci.type === 'setD_mcq_toIt' || ci.type === 'setD_write') {
+    let t = ci.term;
+    if(t) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${t.it}</b> = ${t.ar}<br>
+      <span style="color:var(--muted); font-size:12px;" dir="ltr">${t.note}</span>
+    </div>`;
+  } else if (ci.type === 'setE_mcq_plural' || ci.type === 'setE_mcq_art' || ci.type === 'setE_write') {
+    let w = ci.word;
+    if(w) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${w.it}</b> → <b dir="ltr">${w.itP}</b> &nbsp;|&nbsp; <b dir="ltr">${w.artS} ${w.it}</b> → <b dir="ltr">${w.artP} ${w.itP}</b><br>
+      <span style="color:var(--muted); font-size:12px;">القاعدة: ${w.rule}</span>
+    </div>`;
+  } else if (ci.type === 'setB_write' || ci.type === 'setC_mcq' || ci.type === 'setC_write') {
+    const artRules = {"il":"مذكر + ساكن عادي","lo":"مذكر + Z أو S+ساكن","la":"مؤنث + ساكن","l'":"يبدأ بمتحرك (مذكر أو مؤنث)"};
+    let rule = artRules[ctext] || '';
+    if(rule) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.6; font-weight:600; color:#333;">💡 <b dir="ltr">${ctext}</b> = ${rule}</div>`;
+
+  /* ── SET G EXPLANATIONS ── */
+  } else if (ci.type === 'setG_decompose') {
+    let ch = ci.chunk;
+    let exHtml = ch.examples
+      ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;">${ch.examples.map(e=>`<span style="background:#e3f2fd;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:700;direction:ltr;">${e.it} — ${e.ar}</span>`).join('')}</div>` : '';
+    explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${ch.it}</b> = <b dir="ltr">${ch.decomp}</b><br>
+      <span style="font-size:12px; color:var(--muted);">${ch.note}</span>
+      ${exHtml}
+    </div>`;
+  } else if (ci.type === 'setG_combine') {
+    let ch = ci.chunk;
+    let exHtml = ch.examples
+      ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;">${ch.examples.slice(0,2).map(e=>`<span style="background:#e3f2fd;border-radius:6px;padding:3px 9px;font-size:12px;font-weight:700;direction:ltr;">${e.it} — ${e.ar}</span>`).join('')}</div>` : '';
+    explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${ch.prep}</b> + <b dir="ltr">${ch.art}</b> = <b dir="ltr" style="font-size:18px;color:var(--blue);">${ch.it}</b><br>
+      <span style="font-size:12px; color:var(--muted);">${ch.note}</span>
+      ${exHtml}
+    </div>`;
+  } else if (ci.type === 'setG_fill_blank' || ci.type === 'setG_context_pick') {
+    let s = ci.gSentence;
+    if(s) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${s.full}</b><br>
+      <span style="color:var(--muted); font-size:12px;">${s.ar}</span><br>
+      <span style="font-size:12px; color:var(--blue);">${s.prep} + ${s.art} = <b dir="ltr">${s.answer}</b></span>
+    </div>`;
+  } else if (ci.type === 'setG_sentence_translate') {
+    let s = ci.gSentence;
+    if(s) {
+      // highlight the combined form in the sentence
+      let highlighted = s.full.replace(s.answer, `<b style="color:var(--blue);font-size:16px;text-decoration:underline;">${s.answer}</b>`);
+      explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+        💡 <span dir="ltr">${highlighted}</span><br>
+        <span style="color:var(--muted); font-size:12px;">${s.ar}</span><br>
+        <span style="font-size:12px; color:var(--blue);">${s.prep} + ${s.art} = <b dir="ltr">${s.answer}</b></span>
+      </div>`;
+    }
+  } else if (ci.type === 'setG_mistakes_quiz') {
+    let m = ci.gMistake;
+    if(m) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      ✅ الصواب: <b dir="ltr">${m.correct}</b> | 🚫 الخطأ: <span style="color:var(--red);text-decoration:line-through;" dir="ltr">${m.wrong}</span><br>
+      <span style="font-size:12px; color:var(--orange);">📌 ${m.rule}</span><br>
+      <span style="font-size:12px; color:var(--muted);">${m.tip}</span>
+    </div>`;
+
+  /* ── SET I EXPLANATIONS ── */
+  } else if (ci.type === 'setI_see') {
+    let c = ci.chunk;
+    if(c) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${c.it}</b> = ${c.ar}<br>
+      <span style="font-size:12px; color:var(--muted);">${c.note}</span>
+    </div>`;
+  } else if (ci.type === 'setI_mcq') {
+    let c = ci.chunk;
+    if(c) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${c.it}</b> = ${c.ar}<br>
+      <span style="font-size:12px; color:var(--muted);">${c.note}</span>
+    </div>`;
+  } else if (ci.type === 'setI_write') {
+    let c = ci.chunk;
+    if(c) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${c.it}</b> = ${c.ar}<br>
+      <span style="font-size:12px; color:var(--muted);">${c.note}</span>
+    </div>`;
+  } else if (ci.type === 'setI_fill') {
+    let s = ci.sentence;
+    if(s) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      💡 <b dir="ltr">${s.full}</b><br>
+      <span style="color:var(--muted); font-size:12px;">${s.ar}</span>
+    </div>`;
+  } else if (ci.type === 'setI_mistake') {
+    let m = ci.mistake;
+    if(m) explanation = `<div style="font-size:13px; margin-top:8px; line-height:1.8; font-weight:600; color:#333;">
+      ✅ الصواب: <b dir="ltr">${m.correct}</b> | 🚫 الخطأ: <span style="color:var(--red);text-decoration:line-through;" dir="ltr">${m.wrong}</span><br>
+      <span style="font-size:12px; color:var(--orange);">📌 ${m.rule}</span><br>
+      <span style="font-size:12px; color:var(--muted);">${m.tip}</span>
+    </div>`;
+  }
+
+  fb.innerHTML = `<div style="display:flex; align-items:flex-start; gap:8px;">
+    <span style="font-size:20px">${passed?'✅':'❌'}</span>
+    <div>
+      <div style="font-weight:800">${passed ? 'إجابة صحيحة!' : `الصواب: <span dir="ltr" style="font-size:20px; font-weight:900;">${ctext}</span>`}</div>
+      ${explanation}
+    </div>
+  </div>`;
+  
+  fb.style.display = 'block';
+  $('main-btn').textContent = "تابــع ←";
+  waiting = true;
+  if(passed && appState.tts && currentItem.chunk) playTTS(currentItem.chunk.it);
+}
+
+function moveNext() {
+  waiting=false; retryMode=false; session.idx++;
+  renderQuestion();
+}
+
+/* ═════ FINISH COMPUTATION ═════ */
+function finishEngine() {
+  let T = sessionStats.c + sessionStats.w;
+  let scr = T > 0 ? Math.round(sessionStats.c/T*100) : 100;
+  
+  // Processing Regular Core Progress (Chunks)
+  if(!session.setId) {
+    if(!session.isReview) {
+      let pc = getCP(session.chunkId);
+      if(scr>=70) { pc.m=Math.min(5,pc.m+1); pc.mem=100; } else { pc.m=Math.max(1, pc.m-1); pc.mem=40;}
+      let iA = MASTERY[Math.min(4, pc.m-1)].days;
+      pc.nextRv = Date.now() + (iA * 86400000);
+      pc.lastRv = Date.now();
+    } else {
+      let tArs = Array.from(new Set(session.queue.map(q=>q.chunk.it)));
+      tArs.forEach(cT => {
+        let pc = getCP(cT);
+        if(scr>=70) { pc.m=Math.min(5,pc.m+1); pc.mem=100; } else { pc.m=Math.max(1, pc.m-1); }
+        let iA = MASTERY[Math.min(4, pc.m-1)].days;
+        pc.nextRv = Date.now() + (iA * 86400000);
+      });
+    }
+  } 
+  // Processing Exercise SETS
+  else {
+    if(scr >= 75) {
+      appState.sets[session.setId] = Math.max(appState.sets[session.setId], session.setStage);
+    }
+  }
+
+  save();
+
+  // Rendering Results Screen
+  $('progress-bar').style.width = '100%';
+  $('screen-end').innerHTML = `
+    <div class="splash-wrap" style="padding-top:40px;">
+      <div class="end-score" style="color:var(${scr>=70?'--green':'--red'});">${scr}%</div>
+      <div class="end-label">${scr>=90?'أداء ساحق وعظيم! 🤩':(scr>=70?'تقدم ممتاز 🚀':'المزيد من التدريب يولد القوة 💪')}</div>
+    </div>
+    
+    <div class="stat-cards">
+      <div class="scard" style="border-bottom:4px solid var(--green)">
+        <div class="sc-val" style="color:var(--green);">${sessionStats.c}</div>
+        <div style="font-size:12px; color:var(--muted); font-weight:800;">صح</div>
+      </div>
+      <div class="scard" style="border-bottom:4px solid var(--red)">
+        <div class="sc-val" style="color:var(--red);">${sessionStats.w}</div>
+        <div style="font-size:12px; color:var(--muted); font-weight:800;">خطأ</div>
+      </div>
+    </div>
+
+    <div style="background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:16px; text-align:right;">
+      <div style="font-size:13px; font-weight:900; color:var(--text); margin-bottom:10px;">📚 ما تعلمته اليوم:</div>
+      ${(()=>{
+        if(session.isReview) {
+          let cnt = Array.from(new Set(session.queue.map(q=>q.chunk&&q.chunk.it).filter(Boolean))).length;
+          return `<div style="font-size:13px; font-weight:700; color:var(--muted); line-height:1.8;">راجعت <b style="color:var(--blue);">${cnt}</b> مقطعاً — استمر في التكرار اليومي ✅</div>`;
+        } else if(session.setId) {
+          let setNames = {A:'Set A — الحروف المتحركة',B:'Set B — المذكر والمؤنث',C:'Set C — اختيار أداة التعريف',D:'Set D — مصطلحات القواعد',E:'Set E — الجمع وأدواته',F:'Set F — حروف الجر الثمانية',G:'Set G — حروف الجر المدمجة',H:'Set H — التعلم المتدرج',I:'Set I — أدوات الاستفهام'};
+          return `<div style="font-size:13px; font-weight:700; color:var(--muted); line-height:1.8;">أتقنت <b style="color:var(--blue);">${T}</b> سؤالاً من <b style="color:var(--text);">${setNames[session.setId]||'Set '+session.setId}</b></div>`;
+        } else if(session.chunkId) {
+          let ch = CHUNKS.find(c=>c.it===session.chunkId);
+          if(ch) {
+            let noteLines = (ch.note||'').split('.').slice(0,2).join('.').trim();
+            return `<div style="background:#fff; border-radius:10px; padding:10px; border:1px solid var(--border);">
+              <div style="font-size:20px; font-weight:900; color:var(--blue); direction:ltr; margin-bottom:4px;">${ch.it}</div>
+              <div style="font-size:14px; font-weight:700; color:var(--text); margin-bottom:8px;">${ch.ar}</div>
+              <div style="font-size:12px; font-weight:600; color:var(--muted); line-height:1.6;">${noteLines}.</div>
+            </div>`;
+          }
+          return '';
+        }
+        return '';
+      })()}
+    </div>
+
+    ${session.setId 
+        ? `<button class="primary-btn" onclick="renderInfo()">📖 عودة لصفحة الجداول والقواعد</button>`
+        : `<button class="primary-btn" onclick="goHome()">🏠 الشاشة الرئيسية والمنهج</button>`
+    }
+  `;
+  showScreen('end');
+  session = null; 
+}
+
+
+/* ═════ 3. THE INFOS & EXERCISE SCREEN (Sets Replica from IMG) ═════ */
+function renderInfo() {
+  let A = appState.sets.A, B = appState.sets.B, C = appState.sets.C;
+  
+  // Logic limits stages to max 3 internally (stage=1,2,3 logic coded). UI says Done at 3.
+  let isA_Done = A >= 3, next_A = Math.min(3, A + 1);
+  let b_lkd = false, isB_Done = B >= 3, next_B = Math.min(3, B + 1);
+  let c_lkd = false, isC_Done = C >= 3, next_C = Math.min(3, C + 1);
+  let D = appState.sets.D || 0, isD_Done = D >= 3, next_D = Math.min(3, D + 1);
+  let E = appState.sets.E || 0, e_lkd = false, isE_Done = E >= 3, next_E = Math.min(3, E + 1);
+  let F = appState.sets.F || 0, isF_Done = F >= 3, next_F = Math.min(3, F + 1);
+  let G = appState.sets.G || 0; let g_lkd = false; let isG_Done = G >= 5; let next_G = Math.min(5, G + 1);
+  let H = appState.sets.H || 0; let isH_Done = H >= 3; let next_H = Math.min(3, H + 1);
+
+  // Replicating Cards:
+  function RCard(iconT, clsIcon, stit, ssub, itTerm, progL, isLocked, isFin, f_stage, f_char) {
+    let maxStage = (f_char === 'G') ? 5 : 3;
+    let lockDiv = isLocked ? `<span class="set-badge locked">مقفول 🔒</span>` : (isFin ? `<span class="set-badge done">مكتمل ✅</span>` : `<span class="set-badge prog">المرحلة ${f_stage}/${maxStage}</span>`);
+    return `
+    <div class="set-card ${isFin?'done':''} ${isLocked?'locked':''}" onclick="if(!${isLocked}){startSetEnv('${f_char}', ${f_stage});}">
+       <div style="display:flex; align-items:center;">
+          ${lockDiv}
+       </div>
+       <div class="set-text-area">
+          <div class="set-title">${stit} <span class="set-icon-box ${clsIcon}">${iconT}</span></div>
+          <div class="set-sub">${ssub}</div>
+          <div style="margin-top:5px; display:flex; align-items:center; gap:6px; justify-content:flex-end;">
+            <span dir="ltr" style="font-size:11px; font-weight:800; color:var(--blue); font-family:'Courier New', monospace; background:#e3f2fd; padding:2px 7px; border-radius:6px;">${itTerm}</span>
+            <span onclick="event.stopPropagation(); playTTS('${itTerm}')" style="cursor:pointer; font-size:14px;" title="انطق الاسم الإيطالي">🔊</span>
+          </div>
+       </div>
+    </div>`;
+  }
+
+  let I = appState.sets.I || 0, isI_Done = I >= 3, next_I = Math.min(3, I + 1);
+
+  let UI_SETS = `
+    <div class="sets-grid">
+      ${RCard('⚥',  'icon-gender', 'Set B — مذكر / مؤنث',          'تمييز الجنس من النهاية',                   'Il Genere: Maschile / Femminile',  B, false,  isB_Done, next_B, 'B')}
+      ${RCard('abc','icon-abc',    'Set A — الحروف المتحركة',        'هل الكلمة تبدأ بحرف متحرك؟',               'Vocali: A E I O U',                 A, false,  isA_Done, next_A, 'A')}
+      ${RCard('📝', 'icon-art',    'Set C — أداة التعريف',           "il / lo / la / l' في المفرد",              "L'Articolo Determinativo",          C, false,  isC_Done, next_C, 'C')}
+      ${RCard('📚', 'icon-art',    'Set E — الجمع',                  'المذكر والمؤنث في الجمع',                   'Il Plurale: Maschile / Femminile',  E, false,  isE_Done, next_E, 'E')}
+      ${RCard('🏷️','icon-abc',    'Set D — أسماء المصطلحات',        'احفظ أسماء الأقسام بالإيطالي',             'Terminologia Grammaticale',         D, false,  isD_Done, next_D, 'D')}
+      ${RCard('🔤', 'icon-abc',    'Set F — حروف الجر البسيطة',      'A · DI · DA · IN · SU · PER · CON · TRA',  'Preposizioni Semplici',             F, false,  isF_Done, next_F, 'F')}
+      ${RCard('🔗', 'icon-art',    'Set G — حروف الجر المدمجة',      "AL · DELLA · NELL' · SUGLI ...",           'Preposizioni Articolate',           G, false,  isG_Done, next_G, 'G')}
+      ${RCard('❓', 'icon-abc',    'Set I — أدوات الاستفهام',        'quando · dove · come · cosa · chi · quale', 'Parole Interrogative',              I, false,  isI_Done, next_I, 'I')}
+    </div>
+    
+    <div style="margin-top:20px; padding:16px; background:linear-gradient(135deg, #e8f5e9, #f1f8e9); border-radius:14px; border:2px solid var(--green);">
+      <div style="text-align:center; margin-bottom:12px;">
+        <span style="background:var(--green); color:#fff; padding:5px 14px; border-radius:20px; font-size:12px; font-weight:800;">جديد - نظام التعلم المتدرج</span>
+      </div>
+      <h3 style="text-align:center; font-size:16px; font-weight:900; color:var(--text); margin-bottom:8px;">Set H — الطبقات الأربع</h3>
+      <p style="text-align:center; font-size:13px; color:var(--muted); font-weight:600; margin-bottom:14px; line-height:1.6;">
+        تعلم واقعي ومتدرج: الكلمة → حرف الجر → سبب الدمج → التطبيق
+      </p>
+      <div style="display:flex; justify-content:center; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
+        <span style="background:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; color:var(--teal);">1. الكلمة</span>
+        <span style="color:var(--muted);">→</span>
+        <span style="background:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; color:var(--blue);">2. حرف الجر</span>
+        <span style="color:var(--muted);">→</span>
+        <span style="background:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; color:var(--purple);">3. الدمج</span>
+        <span style="color:var(--muted);">→</span>
+        <span style="background:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:700; color:var(--green);">4. التطبيق</span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="primary-btn" style="flex:1; margin:0;" onclick="startLayeredLearning(1)">
+          ${H >= 1 ? 'Stage 1: IL (al, dal, nel...)' : 'ابدأ Stage 1: IL'}
+        </button>
+      </div>
+      ${H >= 1 ? `
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button class="secondary-btn" style="flex:1; margin:0;" onclick="startLayeredLearning(2)">Stage 2: LA + L'</button>
+        ${H >= 2 ? `<button class="secondary-btn" style="flex:1; margin:0;" onclick="startLayeredLearning(3)">Stage 3: LO</button>` : ''}
+      </div>
+      ` : ''}
+      <div style="text-align:center; margin-top:10px;">
+        <span style="font-size:12px; color:var(--muted); font-weight:600;">التقدم: المرحلة ${next_H}/3</span>
+      </div>
+    </div>
+    
+    <button class="ghost-btn" style="margin-top:14px; font-size:13px; color:var(--red); border-color:var(--red);" onclick="confirmResetSets()">🔄 إعادة ضبط مستويات التمارين</button>
+  `;
+
+  // Combining Rules with pure html.
+  function drawRz(listItems) {
+    return listItems.map(k => `
+      <div class="info-rule">
+         <div class="info-rule-title">${k.rule || `<span style="font-family:'Courier New', monospace; font-size:18px; color:var(--purple);">${k.it}</span> → ${k.ar}`}</div>
+         <div class="info-rule-desc">${k.note || ''}</div>
+         <div class="info-ex-wrap">
+           ${k.examples? k.examples.map(v => `<div class="info-ex-chip">${v}</div>`).join(''):''}
+         </div>
+         ${k.exceptions && k.exceptions.length > 0 ? `<div class="info-exception">مخالف للقاعدة: ${k.exceptions.join(', ')}</div>`:''}
+      </div>`).join('');
+  }
+
+  $('screen-info').innerHTML = `
+    <h2 class="q-title" style="margin-top:10px;">🧠 التدريب الذكي والتمارين</h2>
+    ${UI_SETS}
+    <div style="margin:26px 0 16px;">
+       <h2 class="q-title">📖 المرجع اللغوي المُكثف</h2>
+    </div>
+
+    <div class="info-section">
+      <h3>
+        <span dir="ltr" onclick="playTTS('Il Genere: Maschile e Femminile')" style="cursor:pointer; display:block; font-size:12px; color:var(--blue); font-family:'Courier New',monospace; letter-spacing:1px; margin-bottom:6px; background:#e3f2fd; padding:4px 8px; border-radius:6px;">Il Genere: Maschile / Femminile 🔊</span>
+        كيف أميز الجنس الإيطالي؟
+      </h3>
+      ${drawRz(GENDER_RULES)}
+    </div>
+
+    <div class="info-section">
+      <h3>
+        <span dir="ltr" onclick="playTTS('Articolo Determinativo')" style="cursor:pointer; display:block; font-size:12px; color:var(--blue); font-family:'Courier New',monospace; letter-spacing:1px; margin-bottom:6px; background:#e3f2fd; padding:4px 8px; border-radius:6px;">L'Articolo Determinativo 🔊</span>
+        كيف أختار أداة التعريف؟
+      </h3>
+      ${drawRz(ARTICLE_RULES)}
+    </div>
+
+    <div class="info-section">
+      <h3>
+        <span dir="ltr" onclick="playTTS('Preposizioni Semplici')" style="cursor:pointer; display:block; font-size:12px; color:var(--blue); font-family:'Courier New',monospace; letter-spacing:1px; margin-bottom:6px; background:#e3f2fd; padding:4px 8px; border-radius:6px;">Preposizioni Semplici 🔊</span>
+        حروف الجر البسيطة
+      </h3>
+      ${drawRz(PREP_RULES)}
+    </div>
+
+    <div class="info-section" style="overflow-x:auto;">
+      <h3>
+        <span dir="ltr" onclick="playTTS('Preposizioni Articolate')" style="cursor:pointer; display:block; font-size:12px; color:var(--blue); font-family:'Courier New',monospace; letter-spacing:1px; margin-bottom:6px; background:#e3f2fd; padding:4px 8px; border-radius:6px;">Preposizioni Articolate 🔊</span>
+        حروف الجر المدمجة مع الأدوات
+      </h3>
+      <table class="ref-table">
+         <tr> <th>IL</th><th>LO</th><th>LA</th><th>L'</th> <th>I</th><th>GLI</th><th>LE</th> <th>(Prepo)</th> </tr>
+         <tr> <td>AL</td><td>ALLO</td><td>ALLA</td><td>ALL'</td> <td>AI</td><td>AGLI</td><td>ALLE</td> <td class="art">A</td> </tr>
+         <tr> <td>DEL</td><td>DELLO</td><td>DELLA</td><td>DELL'</td> <td>DEI</td><td>DEGLI</td><td>DELLE</td> <td class="art">DI</td> </tr>
+         <tr> <td>DAL</td><td>DALLO</td><td>DALLA</td><td>DALL'</td> <td>DAI</td><td>DAGLI</td><td>DALLE</td> <td class="art">DA</td> </tr>
+         <tr> <td>NEL</td><td>NELLO</td><td>NELLA</td><td>NELL'</td> <td>NEI</td><td>NEGLI</td><td>NELLE</td> <td class="art">IN</td> </tr>
+         <tr> <td>SUL</td><td>SULLO</td><td>SULLA</td><td>SULL'</td> <td>SUI</td><td>SUGLI</td><td>SULLE</td> <td class="art">SU</td> </tr>
+      </table>
+      <div style="text-align:center; color:var(--muted); font-size:12px; margin-top:10px;">ملحوظة هامة: Per و Con لا يتدمجان ويفصلان مثل (Con il , per il) 💡</div>
+    </div>
+    
+    <br><br>
+    <button class="primary-btn" onclick="goHome()">🏠 العودة للصفحة الرئيسية</button>
+  `;
+  showScreen('info');
+}
+
+// Event Bindings
+$('btn-tts').addEventListener('click', ()=>{
+  appState.tts = !appState.tts; 
+  save(); 
+  $('btn-tts').textContent = appState.tts?'🔊':'🔇';
+});
+
+
+function confirmResetSets() {
+  // Show a confirm screen inside screen-end
+  $('screen-end').innerHTML = `
+    <div style="padding:30px 20px; text-align:center;">
+      <div style="font-size:48px; margin-bottom:12px;">⚠️</div>
+      <h2 class="q-title">إعادة ضبط التمارين؟</h2>
+      <p style="color:var(--muted); font-size:14px; font-weight:600; line-height:1.7; margin-bottom:24px;">
+        سيتم إعادة مستويات جميع التمارين (A → I) إلى الصفر.<br>
+        تقدمك في الحفظ الأساسي لن يتأثر.
+      </p>
+      <button class="primary-btn" style="background:var(--red); box-shadow:0 4px 0 #b71c1c;" onclick="resetSets()">نعم، أعد الضبط</button>
+      <button class="ghost-btn" onclick="renderInfo()">إلغاء</button>
+    </div>`;
+  showScreen('end');
+}
+
+function resetSets() {
+  appState.sets = {A:0, B:0, C:0, D:0, E:0, F:0, G:0, H:0, I:0};
+  save();
+  renderInfo();
+}
+
+/* ═══════════════════════════ LAYERED LEARNING SYSTEM ═══════════════════════════ */
+function startLayeredLearning(stage) {
+  sessionStats = {c:0, w:0};
+  
+  // فلترة الوحدات حسب المرحلة
+  let units = getLearningUnitsByStage(stage);
+  if(units.length === 0) {
+    // إذا لم توجد وحدات للمرحلة المطلوبة، استخدم كل الوحدات
+    units = LEARNING_UNITS.filter(u => u.stage <= stage);
+  }
+  
+  // بناء طابور الأسئلة المتدرج
+  let queue = [];
+  shuffle(units).forEach(unit => {
+    queue.push(...buildLayeredQueue(unit));
+  });
+  
+  session = { 
+    queue: queue, 
+    idx: 0, 
+    setId: 'H', 
+    setStage: stage,
+    isLayered: true 
+  };
+  
+  // عرض مقدمة المرحلة
+  let stageIntros = {
+    1: {
+      title: 'المرحلة 1 — أساسيات IL',
+      icon: '📘',
+      desc: 'سنتعلم الصيغ المدمجة مع أداة التعريف IL (مذكر مفرد يبدأ بساكن عادي)',
+      examples: ['al bar', 'dal dottore', 'nel parco', 'sul tavolo', 'del pane'],
+      formula: 'a/da/in/su/di + il = al/dal/nel/sul/del'
+    },
+    2: {
+      title: 'المرحلة 2 — LA و L\'',
+      icon: '📗',
+      desc: 'سنتعلم الصيغ المدمجة مع LA (مؤنث) و L\' (يبدأ بمتحرك)',
+      examples: ['alla stazione', 'dalla porta', 'nella borsa', "all'universita"],
+      formula: 'a/da/in/su/di + la/l\' = alla/dalla/nella/... / all\'/dall\'/nell\'...'
+    },
+    3: {
+      title: 'المرحلة 3 — LO والحالات الخاصة',
+      icon: '📙',
+      desc: 'سنتعلم الصيغ مع LO (يبدأ بـ s+ساكن أو z)',
+      examples: ['allo stadio', 'dallo studente', 'nello zaino', 'sullo schermo'],
+      formula: 'a/da/in/su/di + lo = allo/dallo/nello/sullo/dello'
+    }
+  };
+  
+  let intro = stageIntros[stage];
+  $('screen-end').innerHTML = `
+    <div style="padding:20px 14px;">
+      <div style="text-align:center; font-size:48px; margin-bottom:10px;">${intro.icon}</div>
+      <h2 class="q-title">${intro.title}</h2>
+      <p style="text-align:center; font-size:14px; color:var(--muted); font-weight:600; line-height:1.7; margin-bottom:16px;">
+        ${intro.desc}
+      </p>
+      <div class="hint-box" style="text-align:center; margin-bottom:16px;">
+        <b dir="ltr">${intro.formula}</b>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:20px;">
+        ${intro.examples.map(e => `<span style="background:var(--blue-lt); color:var(--blue); padding:5px 12px; border-radius:8px; font-size:13px; font-weight:700; direction:ltr;">${e}</span>`).join('')}
+      </div>
+      <div style="background:#f3e5f5; border-radius:12px; padding:14px; margin-bottom:20px;">
+        <h4 style="text-align:center; font-size:14px; font-weight:800; color:var(--purple); margin-bottom:10px;">كيف يعمل نظام الطبقات؟</h4>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:12px; color:var(--text); font-weight:600;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:var(--teal); color:#fff; padding:3px 8px; border-radius:6px; font-size:10px;">1</span>
+            <span>تتعرف على الكلمة ومعناها وجنسها</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:var(--blue); color:#fff; padding:3px 8px; border-radius:6px; font-size:10px;">2</span>
+            <span>تتعلم حرف الجر ولماذا نستخدمه</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:var(--purple); color:#fff; padding:3px 8px; border-radius:6px; font-size:10px;">3</span>
+            <span>تفهم كيف ولماذا يحدث الدمج</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="background:var(--green); color:#fff; padding:3px 8px; border-radius:6px; font-size:10px;">4</span>
+            <span>تطبق ما تعلمته في جمل حقيقية</span>
+          </div>
+        </div>
+      </div>
+      <button class="primary-btn" onclick="launchLayeredSession()">ابدأ التعلم المتدرج</button>
+      <button class="ghost-btn" onclick="renderInfo()">رجوع</button>
+    </div>
+  `;
+  showScreen('end');
+}
+
+function launchLayeredSession() {
+  renderQuestion();
+  showScreen('session');
+}
+
+// START EXECUTION ON LOAD
+window.onload = () => { load(); processDecay(); renderHome(); }
