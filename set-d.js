@@ -3,4 +3,5 @@ const SET_D_TERMS = [
   {it:'Articolo Determinativo',  ar:'أداة التعريف',         note:'il · lo · la · l\' · i · gli · le'},
   {it:'Preposizioni Semplici',   ar:'حروف الجر البسيطة',    note:'a · di · da · in · su · per · con · tra'},
   {it:'Preposizioni Articolate', ar:'حروف الجر المدمجة',    note:'al · del · dal · nel · sul ...'},
+  {it:'Articolo Indeterminativo',ar:'أداة النكرة',          note:"un · uno · una · un'"},
 ];
